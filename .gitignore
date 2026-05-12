@@ -1,0 +1,10 @@
+"""
+gitignore
+"""
+data.json
+data.pkl
+engine_testing.py
+F8.cmn
+F8.fmn
+F8steadi_v1-24.scn
+pytedi_planning.py
