@@ -34,7 +34,16 @@ import numpy as np
 from numba import jit
 #import time
 
-# =======================================================================================================================
+# %%=======================================================================================================================
+'''
+This function runs the model.
+It starts with pre-processing the data and checking data integrity, then runs either calc_from_up_to_down or calc_from_down_to_up.
+'''
+def calc_dams():
+    pass
+
+
+# %%=======================================================================================================================
 '''
 This function will calculate the flow DOWNstream of the dams given the total catchment flow UPstream.
 '''
@@ -89,7 +98,7 @@ def calc_from_up_to_down(damlist_df, demands_df, rain_df, evap_df, flowin_df, ca
 
     return global_results, alldam_results
 
-# =======================================================================================================================
+# %%=======================================================================================================================
 #@jit (nopython=True)
 def tedi_engine_down(flow,rain,evap,demd,years,monthday,history,dams,catcharea,istart,iend):
         
@@ -131,7 +140,7 @@ def tedi_engine_down(flow,rain,evap,demd,years,monthday,history,dams,catcharea,i
     
     return global_results, alldam_results
 
-# =======================================================================================================================
+# %%=======================================================================================================================
 '''
 This function will calculate the flow DOWNstream of the dams given the total catchment flow UPstream.
 '''
@@ -185,7 +194,7 @@ def calc_from_down_to_up(damlist_df, demands_df, rain_df, evap_df, flowout_df, c
     
     return global_results, alldam_results
 
-# =======================================================================================================================
+# %%=======================================================================================================================
 '''
 This function will calculate the flow UPstream of the dams given the total catchment flow DOWNstream.
 This is much harder than calculating the other way, because the flow has to be estimated iteratively.
@@ -276,6 +285,7 @@ def tedi_engine_up(flow,rain,evap,demd,years,monthday,history,dams,catcharea,ist
     
     return global_results, alldam_results # these outputs are very very long lists
         
+# %%=======================================================================================================================
 '''
 This function will calculate the flow from up to down for a single timestep.
 It needs to be run recursively to find a suitable upstream flow, or can just be run once to find the downstream flow.
@@ -394,7 +404,7 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
     
     return estore, singlestep_results, dam_results 
 
-# =============================================================================
+# %%=======================================================================================================================
 
 def get_us_to_ds_order(df):
     
@@ -410,7 +420,8 @@ def get_us_to_ds_order(df):
         branch_junctions = df[df['dam_id'].isin(df['ds_dam_id'])]
         
     return reordered_id_list
-# =============================================================================
+
+# %%=======================================================================================================================
 
 def damlist_preprocessing(damlist_df, demands_df, cat_area, scale_limit):
     
@@ -442,5 +453,5 @@ def damlist_preprocessing(damlist_df, demands_df, cat_area, scale_limit):
     damlist_df.loc[new_row_idx] = new_row
 
     return damlist_df
-# =============================================================================
 
+# %%=======================================================================================================================
