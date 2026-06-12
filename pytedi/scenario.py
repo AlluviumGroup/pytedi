@@ -4,7 +4,7 @@ pytedi - Python Tool for Estimating Dam Impacts
 -----------------------------------------------
 
 Dr Robert Morden
-October 2025
+June 2026
 
 These are the routines for converting old windows scenario files.
 Users can convert old windows STEDI and TEDI files for use with pyTEDI.
@@ -13,7 +13,7 @@ Users can convert old windows STEDI and TEDI files for use with pyTEDI.
 """
 
 import pandas as pd
-import numpy as np
+#import numpy as np
 import os
 
 # %%=====================================================================================================================
@@ -28,8 +28,8 @@ def read_scenario_file(scenfile):
     # if the line is anything else, file type not recognised. Give a warning.
     with open(scenfile, encoding='latin-1') as stream:
         line1 = stream.readline()
-        line2 = stream.readline()
-        if line2[:17] == 'STEDI  Version 1.':
+        line1 = stream.readline()
+        if line1[:17] == 'STEDI  Version 1.':
             scenfile_type = 'STEDI'
         else:
             scenfile_type = 'unknown'
@@ -299,39 +299,38 @@ def read_scenario_winstedi_v1(scenfile):
                         match line[:30].strip().lower():                             # only read the first 30 characters - lots of data on the same line
                             
                             case 'multiple demand groups?':
-                                txt1 = line[40:].strip().lower()
+                                txt1 = line[38:].strip().lower()
                                 if txt1 == 'true':
                                     params['dam_list_inc_demgroups'] = True
                                     params['demand_group_method'] = 'list'
                                 else:
                                     params['dam_list_inc_demgroups'] = False
                                 
-                                
                             case 'multiple results groups?':
                                 pass                                
                             
                             case 'winterfill pumping?':
-                                txt1 = line[40:]
+                                txt1 = line[38:]
                                 parts = txt1.split()
-                                if parts[0] == 'true':
+                                if parts[0].strip().lower() == 'true':
                                     params['dam_list_inc_wfill'] = True
+                                    params['wfill_start_mmdd'] = int(parts[1])
+                                    params['wfill_end_mmdd'] = int(parts[2])
                                 else:
                                     params['dam_list_inc_wfill'] = False
-                                params['wfill_start_mmdd'] = int(parts[1])
-                                params['wfill_end_mmdd'] = int(parts[2])
                                 
                             case 'low flow bypasses?':
-                                txt1 = line[40:]
+                                txt1 = line[38:]
                                 parts = txt1.split()
-                                if parts[0] == 'true':
+                                if parts[0].strip().lower() == 'true':
                                     params['dam_list_inc_bypass'] = True
+                                    params['bypass_start_mmdd'] = int(parts[1])
+                                    params['bypass_end_mmdd'] = int(parts[2])
                                 else:
                                     params['dam_list_inc_bypass'] = False
-                                params['bypass_start_mmdd'] = int(parts[1])
-                                params['bypass_end_mmdd'] = int(parts[2])
                                 
                             case 'spatial networking?':
-                                txt1 = line[40:]
+                                txt1 = line[38:].strip().lower()
                                 if txt1 == 'true':
                                     params['dam_list_inc_network'] = True
                                 else:
@@ -374,7 +373,7 @@ def read_scenario_winstedi_v1(scenfile):
             
                                 # Create a dataframe from the collected data
                                 params['damlist'] = pd.DataFrame({'dam_id': damid,
-                                                                  'ds_dam_id': ds_damid,
+                                                                  'ds_damid': ds_damid,
                                                                   'surfacearea_m2': sa,
                                                                   'vol_ML': vol,
                                                                   'catchuptotal_km2': ca,
@@ -395,7 +394,4 @@ def read_scenario_oldtedi_v1(scenfile):
 
 
 # %%=====================================================================================================================
-# scenfile = r'C:/Users/robert.morden/OneDrive - Alluvium Consulting Australia/_Roberts stuff/Tools/STEDI/V1-2/Sample Data/test2.scn'
-# params = read_scenario_file(scenfile)
-fname = 'F8steadi_v1-24.scn'
-params = read_scenario_file(fname)
+

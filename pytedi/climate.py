@@ -5,7 +5,7 @@ pytedi - Python Tool for Estimating Dam Impacts
 -----------------------------------------------
 
 Dr Robert Morden
-December 2025
+June 2026
 
 This is the code for importing climate and inflows.
 Climate can come from a csv, or a getdat file
@@ -79,4 +79,4 @@ def read_STEDI_clim(fname,ifield,tstep):
     return vals
 
 # %%=====================================================================================================================
-#out = process_STEDI_climate(params)
+

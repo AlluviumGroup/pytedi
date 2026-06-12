@@ -5,7 +5,7 @@ pytedi - Python Tool for Estimating Dam Impacts
 -----------------------------------------------
 
 Dr Robert Morden
-December 2025
+June 2026
 
 This is where a list of dams is developed based on input data.
 Inputs could be a straightforward dataframe, or an old STEDI scenario file.
@@ -32,6 +32,7 @@ def damlist_from_list(params):
     
     '''
     This function creates a list of dams from list provided by a windows STEDI scenario file.
+    Note this is a PURE list of DAMS ONLY. The outlet is removed because its not really a dam.
     
     Parameters
     ----------
@@ -43,45 +44,67 @@ def damlist_from_list(params):
             - vol_surfarea_a
             - vol_surfarea_b
             - dam_list_inc_network
-            - damlist
+            - damlist (dataframe with the following fields...)
+                - dam_id
+                - ds_dam_id         (optional here, only if dam_list_inc_network = True)
+                - surfacearea_m2
+                - vol_ML
+                - catchuptotal_km2
+                - group_name        (not necessary here, only populated if dam_list_inc_demgroups=True)
+                - wfill_MLperT      (not necessary here, only populated if dam_list_inc_wfill=True)
+                - bypass_MLperT     (not necessary here, only populated if dam_list_inc_bypass=True)
 
     Returns
     -------
     damlist : dataframe
         List of dams in a dataframe.
+        The fields in the dataframe include:
+            - dam_id
+            - ds_damid
+            - surfacearea_m2
+            - vol_ML
+            - bypass_MLperT  (not filled in here)
+            - wfill_MLperT  (not filled in here)
+            - catchuptotal_km2
+            - catchuplocal_km2
+            
     '''
     
     damlist = params['damlist']                                                # grab the dataframe from the STEDI scenario file (columns already correct)
     
-    damlist.loc[damlist['dam_id']==1,'surfacearea_m2'] = 0.0                   # In a STEDI file, dam # 1 is always the catchment outlet -> Fix parameters
-    damlist.loc[damlist['dam_id']==1,'vol_ML'] = 0.0
-    damlist.loc[damlist['dam_id']==1,'wfill_MLperT'] = 0.0
-    damlist.loc[damlist['dam_id']==1,'bypass_MLperT'] = 0.0
+    # In a STEDI file, dam # 1 is always the catchment outlet -> REMOVE IT - we only want a list of actual dams
+    filt = damlist['dam_id']!=1                                                # filter to exclude the outlet
+    damlist = damlist.loc[filt,:].copy()                                       # remove the outlet from the list (It gets added back later as part of dam pre-processing)
     
-    if not 'catchuplocal_km2' in damlist:                                      # calculate interstation areas if not already present
-        damlist['catchuplocal_km2'] = damlist['catchuptotal_km2']
-        
-        for index, row in damlist.iterrows():                                  # Iterate through each dam and calculate the local upstream area
-            damid = row['dam_id']
-            a_tot = row['catchuptotal_km2']
-            
-            us_dams = damlist[damlist['ds damid'] == damid]                    # Find dams that have a ds damid matching the current damid
-            us_area_sum = us_dams['total_area'].sum()                          # Calculate the sum of the areas of the upstream dams
-            
-            a_loc = a_tot - us_area_sum                                        # Calculate the local upstream area
-            
-            damlist.at[index, 'local_upstream_area'] = a_loc                   # Update the local upstream area in the dataframe
-        
-    total_area = params['cat_area_km2']                                        # check total catchment area
-    scale_limit = params['scale_limit']
-    total_dam_catch = damlist['catchuplocal_km2'].sum()
-    if total_dam_catch > (total_area*scale_limit):
-        factor = (total_area*scale_limit) / total_dam_catch
-        damlist['catchuplocal_km2'] = damlist['catchuplocal_km2'] * factor
-        damlist['catchuptotal_km2'] = damlist['catchuptotal_km2'] * factor
+    filt = damlist['ds_damid'] == 1                                            # identify all dams which flow directly to the outlet
+    damlist.loc[filt,'ds_damid'] = -99                                         # set their ds dam to -99 (because we just removed the outlet node, we will put it back later)
     
-    # check connectivity - specified, or all feed to outlet
-        
+    if params['dam_list_inc_network']:
+        if not 'catchuplocal_km2' in damlist:                                      # calculate interstation areas if not already present
+            damlist['catchuplocal_km2'] = np.nan
+            
+            for index, row in damlist.iterrows():                                  # Iterate through each dam and calculate the local upstream area
+                damid = row['dam_id']
+                a_tot = row['catchuptotal_km2']
+                
+                us_dams = damlist[damlist['ds_damid'] == damid]                    # Find dams that have a ds damid matching the current damid
+                us_area_sum = us_dams['catchuptotal_km2'].sum()                    # Calculate the sum of the areas of the upstream dams
+                
+                a_loc = a_tot - us_area_sum                                        # Calculate the local upstream area
+                
+                damlist.loc[index, 'catchuplocal_km2'] = a_loc                      # Update the local upstream area in the dataframe
+    else:
+        damlist.loc[:,'catchuplocal_km2'] = damlist['catchuptotal_km2']                  # set LOCAL equal to TOTAL UPSTREAM
+    
+    # total_area = params['cat_area_km2']                                        # check total catchment area
+    # scale_limit = params['scale_limit']
+    # total_dam_catch = damlist['catchuplocal_km2'].sum()                        # sum of local catchments of dams, EXCLUDING OUTLET
+    
+    # if total_dam_catch > (total_area*scale_limit):
+    #     factor = (total_area*scale_limit) / total_dam_catch
+    #     damlist['catchuplocal_km2'] = damlist['catchuplocal_km2'] * factor
+    #     damlist['catchuptotal_km2'] = damlist['catchuptotal_km2'] * factor
+    
     return damlist
     
 # %%=====================================================================================================================
@@ -89,6 +112,7 @@ def damlist_from_distribution(params):
     
     '''
     This function creates a list of dams from distribution provided by a windows STEDI scenario file.
+    Note this is a PURE list of DAMS ONLY. The outlet is not created here because its not really a dam.
     
     Parameters
     ----------
@@ -108,6 +132,15 @@ def damlist_from_distribution(params):
     -------
     damlist : dataframe
         List of dams in a dataframe.
+        The fields in the dataframe include:
+            - dam_id
+            - ds_damid
+            - surfacearea_m2
+            - vol_ML
+            - bypass_MLperT  (not filled in here)
+            - wfill_MLperT  (not filled in here)
+            - catchuptotal_km2
+            - catchuplocal_km2
     '''
 
     # get key parameters
@@ -123,7 +156,7 @@ def damlist_from_distribution(params):
     
     # set up the list dataframe
     damlist = pd.DataFrame(columns=['dam_id'])
-    damlist.set_index('dam_id',inplace=True)
+    #damlist.set_index('dam_id',inplace=True)
     
     # set up a random number generator
     rng = np.random.default_rng(seed=42)
@@ -149,7 +182,7 @@ def damlist_from_distribution(params):
     # generate surface areas
     # volume = A x surfarea^B
     # surfarea = (volume / A)^(1/B)
-    damlist['surfarea_m2'] = (damlist['vol_ML']/aa)**(1/bb)
+    damlist['surfacearea_m2'] = (damlist['vol_ML']/aa)**(1/bb)
     
     # generate catchment areas - this requires a separate routine. Need to specify in the params whether this is randomly assigned (Morden 2018), or linearly assigned (Nathan 2004).
     if catcharea_method == 'random':
@@ -158,10 +191,12 @@ def damlist_from_distribution(params):
     elif catcharea_method == 'linear':
         catch_areas = catch_areas_linear(damlist['vol_ML'],params)
     
-    damlist['catcharea_km2'] = catch_areas
+    damlist['catchuptotal_km2'] = catch_areas
+    damlist['catchuplocal_km2'] = catch_areas
     
     # generate downstream dam ids
-    damlist['ds_dam_id'] = int(-99)
+    damlist['dam_id'] = damlist.index + 1
+    damlist['ds_damid'] = int(-99)
     
     # return the list
     return damlist
@@ -266,12 +301,3 @@ def stepwise_lin_interp(x, xp, fp):
     
     return result
 
-# %%
-# import pickle
-
-# # with open("data.pkl", "wb") as f:
-# #     pickle.dump(params, f)
-# with open("data.pkl", "rb") as f:
-#     params = pickle.load(f)
-    
-# damlist = process_STEDI_dams(params)

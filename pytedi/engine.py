@@ -39,9 +39,56 @@ from numba import jit
 This function runs the model.
 It starts with pre-processing the data and checking data integrity, then runs either calc_from_up_to_down or calc_from_down_to_up.
 '''
-def calc_dams():
-    pass
+def calc_dams(model):
+    
+    # get model parameters and inputs -----------------------------------------
+    damlist_df = model.damlist                                                 
+    cat_area = model.cat_area_km2
+    scale_limit = model.scale_limit
+    
+    histoscale_df = model.histoscale.resample('D').interpolate('time')
+    if model.timestep == 'month':
+        histoscale_df = histoscale_df.resample('MS').first()
+    
+    
+    demand_fields = ~model.ts.columns.isin(['rain', 'evap', 'flowup', 'flowdown'])
+    demands_df = model.ts.loc[:,demand_fields]
+    
+    rain_df = model.ts.loc[:,['rain']]
+    evap_df = model.ts.loc[:,['evap']]
+    flowin_df = model.ts.loc[:,['flowup']]
+    flowout_df = model.ts.loc[:,['flowdown']]
+    
+    if model.calc_nat_or_obs == 'obs':
+        q_df = flowin_df
+    elif model.calc_nat_or_obs == 'nat':
+        q_df = flowout_df
+        
+    # check data integrity ----------------------------------------------------
+    # connectivity, catch areas all add up, demand groups all exist in timeseries
+    
+    # Clip timeseries to minimum overlapping period
+    sdate = max(rain_df.first_valid_index(),evap_df.first_valid_index(),q_df.first_valid_index(),demands_df.first_valid_index(),histoscale_df.first_valid_index())
+    edate = min(rain_df.last_valid_index(),evap_df.last_valid_index(),q_df.last_valid_index(),demands_df.last_valid_index(),histoscale_df.last_valid_index())
+    
+    if edate > sdate:
+        rain_df = rain_df.loc[sdate:edate]
+        evap_df = evap_df.loc[sdate:edate]
+        flowin_df = flowin_df.loc[sdate:edate]
+        flowout_df = flowout_df.loc[sdate:edate]
+        demands_df = demands_df.loc[sdate:edate,:]
+        histoscale_df = histoscale_df.loc[sdate:edate]
+    else:
+        raise ValueError("Timeseries do not overlap. Check dates in rain, evap, flow, and demand timeseries.")
+        
+    # run the model -----------------------------------------------------------
+    if model.calc_nat_or_obs == 'obs':                                          
+        global_results, alldam_results = calc_from_up_to_down(damlist_df, demands_df, rain_df, evap_df, flowin_df, cat_area, scale_limit, histoscale_df)
+    
+    elif model.calc_nat_or_obs == 'nat':
+        global_results, alldam_results = calc_from_down_to_up(damlist_df, demands_df, rain_df, evap_df, flowout_df, cat_area, scale_limit, histoscale_df)
 
+    return global_results, alldam_results
 
 # %%=======================================================================================================================
 '''
@@ -51,7 +98,7 @@ def calc_from_up_to_down(damlist_df, demands_df, rain_df, evap_df, flowin_df, ca
 
     damlist_df = damlist_preprocessing(damlist_df, demands_df, cat_area, scale_limit)
     
-    damlist_array = damlist_df.loc[:,['vol_ML','surfacearea_m2','catcharea_km2',
+    damlist_array = damlist_df.loc[:,['vol_ML','surfacearea_m2','catchuplocal_km2',
                                       'demfactor','year_start','demand_id',
                                       'bypass_MLperT','bypass_start_ddmm','bypass_end_ddmm',
                                       'dsdam','output']].to_numpy(dtype='float64')
@@ -148,15 +195,15 @@ def calc_from_down_to_up(damlist_df, demands_df, rain_df, evap_df, flowout_df, c
 
     damlist_df = damlist_preprocessing(damlist_df, demands_df, cat_area, scale_limit)
     
-    damlist_array = damlist_df.loc[:,['vol_ML','surfacearea_m2','catcharea_km2',
+    damlist_array = damlist_df.loc[:,['vol_ML','surfacearea_m2','catchuplocal_km2',
                                       'demfactor','year_start','demand_id',
                                       'bypass_MLperT','bypass_start_ddmm','bypass_end_ddmm',
                                       'dsdam','output']].to_numpy()
     
     # convert timeseries to numpy arrays
-    flow_array = flowout_df.to_numpy().flatten()
-    rain_array = rain_df.to_numpy().flatten()
-    evap_array = evap_df.to_numpy().flatten()
+    flow_array = flowout_df.to_numpy().astype('float64').flatten()
+    rain_array = rain_df.to_numpy().astype('float64').flatten()
+    evap_array = evap_df.to_numpy().astype('float64').flatten()
     demd_array = demands_df.to_numpy()
     
     # create array of year number for each timestep to identify when a dam should activate
@@ -372,7 +419,7 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
         es = max(0.0, min(bal,capc) )                                          # end storage must be between 0 and capacity
         outflow = max(0.0, bal - es)                                           # outflow = positive, but only if balance exceeds end storage
         if dsdam>=0:                                                           # if the next downstream id is -99, then we are at the end of the catchment
-            dsspills[dsdam] = dsspills[dsdam] + outflow                        # outflow directed into another dam
+            dsspills[dsdam] = dsspills[dsdam] + outflow + bprate               # outflow directed into another dam
         
         # aggregate variables across dams as required
         sstore_sum += ss
@@ -383,7 +430,7 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
         estore_sum += es
         if idam == numdams-1:
             outflow_sum = outflow
-            aggimpact_sum = flow_up_sum - outflow_sum
+            aggimpact_sum = flow_up_sum - outflow_sum - bp_sum
         
         # prepare results only if the dam is marked for output
         if damoutput:
@@ -410,14 +457,14 @@ def get_us_to_ds_order(df):
     
     reordered_id_list = []
     
-    branch_ends = df[~df['dam_id'].isin(df['ds_dam_id'])]
-    branch_junctions = df[df['dam_id'].isin(df['ds_dam_id'])]
+    branch_ends = df[~df['dam_id'].isin(df['ds_damid'])]
+    branch_junctions = df[df['dam_id'].isin(df['ds_damid'])]
     
     while len(branch_ends)>0:
         reordered_id_list.extend(branch_ends['dam_id'].to_list())
         df = branch_junctions
-        branch_ends = df[~df['dam_id'].isin(df['ds_dam_id'])]
-        branch_junctions = df[df['dam_id'].isin(df['ds_dam_id'])]
+        branch_ends = df[~df['dam_id'].isin(df['ds_damid'])]
+        branch_junctions = df[df['dam_id'].isin(df['ds_damid'])]
         
     return reordered_id_list
 
@@ -427,30 +474,37 @@ def damlist_preprocessing(damlist_df, demands_df, cat_area, scale_limit):
     
     # determine sum of us areas for selected catchment, adjust if required
     # (ie. the dams cannot impound an area bigger than the total catchment itself, that wouldn't make sense)
-    pc_impound = damlist_df['catcharea_km2'].sum() / cat_area
-    unimp_km2 = cat_area - damlist_df['catcharea_km2'].sum()
+    pc_impound = damlist_df['catchuplocal_km2'].sum() / cat_area
+    unimp_km2 = cat_area - damlist_df['catchuplocal_km2'].sum()
     if pc_impound > scale_limit:
-        damlist_df['catcharea_km2'] = damlist_df['catcharea_km2'] * (scale_limit/pc_impound)
+        damlist_df['catchuplocal_km2'] = damlist_df['catchuplocal_km2'] * (scale_limit/pc_impound)
     
     # sort out the demand groups into integers
     demgroup_mapping = {col_name: i for i, col_name in enumerate(demands_df.columns)}
     damlist_df['demand_id'] = damlist_df['group_name'].map(demgroup_mapping)
 
     # reorder the dams from upstream to downstream - THIS IS CRITICAL!!!
-    new_dam_order = get_us_to_ds_order(damlist_df[['dam_id','ds_dam_id']])
+    new_dam_order = get_us_to_ds_order(damlist_df[['dam_id','ds_damid']])
     damlist_df['dam_id'] = pd.Categorical(damlist_df['dam_id'],categories=new_dam_order,ordered=True)
     damlist_df = damlist_df.sort_values(by='dam_id').reset_index(drop=True)
     damlist_df['dam_id'] = damlist_df['dam_id'].astype('int32')
     
     # sort out the downstream dam ids to be the row index of the downstream dam
     dam_id_to_index = dict(zip(damlist_df['dam_id'], damlist_df.index))
-    damlist_df['dsdam'] = damlist_df['ds_dam_id'].map(dam_id_to_index)
+    damlist_df['dsdam'] = damlist_df['ds_damid'].map(dam_id_to_index)
     
-    # add a row at the end to represent the catchment outlet
+    # create new row number to hold the catchment outlet (don't create the row yet)
     new_row_idx = len(damlist_df)
-    damlist_df['dsdam'] = damlist_df['dsdam'].fillna(new_row_idx).astype(int)
-    new_row = [-99,-99,0,unimp_km2,0,0,0,0,0,101,3112,1,0,-99]
+
+    # Any dams which connect downstream to -99 or any other unknown dam id? Set them equal to the catchment outlet.
+    filt = ~damlist_df['dsdam'].isin(damlist_df['dam_id'])           # ds_dam is NOT in dam_id
+    damlist_df.loc[filt,'dsdam'] = new_row_idx
+
+    # add a row at the end to represent the catchment outlet
+    # need to add [dam_id,ds_damid,surfarea, catchup, catchloc,vol,year,groupname,demfact,bpassQ,bpass_start,bpass_end,wfillQ,wfill_start,wfill_end,output,demandid,dsdam_idx]
+    new_row =     [new_row_idx,-99,-99,      cat_area,unimp_km2,0, 0,   'none',   0,      0,     101,        1231,     0,     101,        1231,     0,     0,       -99]
     damlist_df.loc[new_row_idx] = new_row
+    
 
     return damlist_df
 

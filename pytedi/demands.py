@@ -5,7 +5,7 @@ pytedi - Python Tool for Estimating Dam Impacts
 -----------------------------------------------
 
 Dr Robert Morden
-December 2025
+June 2026
 
 This is the code for setting up demand information.
 Demands are composed of:
@@ -37,7 +37,7 @@ IMPORTANT - It is assumed that the patterns will aggregate to a mean annual valu
 
 import pandas as pd
 import numpy as np
-from climate import read_STEDI_clim
+from .climate import read_STEDI_clim
 
 # %%=====================================================================================================================
 
@@ -86,14 +86,14 @@ def demgroups_byvolume(params,dams):
     group_factors = group_details['Factor'].tolist()
     
     # set up result list
-    groups = pd.Series(index=dams.index)
-    factors = pd.Series(index=dams.index)
+    groups = pd.Series(index=dams.index,dtype='string')
+    factors = pd.Series(index=dams.index,dtype='float32')
     
     # assign
-    groups = group_names[0]
+    groups.loc[:] = group_names[0]
     groups = groups.where(dams['vol_ML']<=vol_thresh,other=group_names[1])
 
-    factors = group_factors[0]
+    factors.loc[:] = group_factors[0]
     factors = factors.where(dams['vol_ML']<=vol_thresh,other=group_factors[1])
 
     return groups,factors
@@ -183,7 +183,7 @@ The output is a DataFrame with a single column per pattern.
 def dempatterns_12m(params,clim):
     
     df_12m = params['dem_12m_patterns']
-    df_12m = df_12m.set_index('Name', drop=True)                                   # reset the index so that the 'Name' column is the index instead of the default integer index
+    df_12m = df_12m.set_index('Name', drop=True)                               # reset the index so that the 'Name' column is the index instead of the default integer index
     
     df_12m = df_12m.loc[:, 'Jan':'Dec']                                        # Select only the columns with the monthly values
     df_12m.columns = [1,2,3,4,5,6,7,8,9,10,11,12]                              # Rename the columns to be numeric for easier processing
@@ -193,19 +193,24 @@ def dempatterns_12m(params,clim):
     end_date = clim.index.max()
     
     if params['timestep'] == 'month':                                          # Create a date range based on the timestep
-        date_range = pd.date_range(start=start_date, end=end_date, freq='M')
+        date_range = pd.date_range(start=start_date, end=end_date, freq='MS')
     elif params['timestep'] == 'day':
         date_range = pd.date_range(start=start_date, end=end_date, freq='D')
     else:
         raise ValueError("Invalid timestep. Must be 'month' or 'day'.")
     
     df_patt = pd.DataFrame(index=date_range,columns=df_12m.columns)
-    df_patt['month_num'] = df_patt.index.month()
     
+    df_12m.index.name = 'Month'                                                # Ensure the index of df_12m is the month number
     
-    for month_num in range(1, 13):                                             # map values from df_12m to the df_patt dataframe based on the month number
-        df_patt.loc[df_patt.index.month == month_num] = df_12m.loc[month_num].values
+    df_patt['Month'] = df_patt.index.month                                     # Create a 'Month' column in df_patt based on the index (assuming the index is a datetime)
     
+    for column in df_12m.columns:                                              # Loop through each column in df_12m and map the values to df_patt
+        if column in df_patt.columns:                                          # Map values based on the 'Month' column
+            df_patt[column] = df_patt['Month'].map(df_12m[column])
+    
+    df_patt.drop(columns=['Month'], inplace=True)                              # Drop the 'Month' column as it's no longer needed
+
     if params['timestep'] == 'day':                                            # If the timestep is daily, disaggregate the monthly values to daily values
         df_patt = df_patt.apply(lambda x: x / x.index.days_in_month)           # divide each monthly value by the number of days in that month
         

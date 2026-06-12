@@ -58,21 +58,31 @@ def STEDI_bypasses(params,dams):
     sdate = []
     edate = []
     
-    for dam in dams['dam_id']:
-        sdate.append(params['bypass_start_mmdd'])
-        edate.append(params['bypass_end_mmdd'])
-    
     if 'bypass_MLperTperKM2' in params.keys():                                 # if there is a global bypass rate per km2
         rateperkm2 = params['bypass_MLperTperKM2']
-        for damarea in dams['catcharea_km2']:
+        for damarea in dams['catchuptotal_km2']:
             rate.append(damarea * rateperkm2)
+        for dam in dams['dam_id']:
+            sdate.append(params['bypass_start_mmdd'])
+            edate.append(params['bypass_end_mmdd'])
     
-    elif params['dam_list_inc_bypass']:                                        # if the bypass rate is given in a list
-        rate = dams['bypass_MLperT'].to_list()
-        
+    
+    elif 'dam_list_inc_bypass' in params.keys():
+        if params['dam_list_inc_bypass']:                                        # if the bypass rate is given in a list
+            rate = dams['bypass_MLperT'].to_list()
+            for dam in dams['dam_id']:
+                sdate.append(params['bypass_start_mmdd'])
+                edate.append(params['bypass_end_mmdd'])
+        else:                                                                      # otherwise set bypass rates to zero
+            for dam in dams['dam_id']:
+                rate.append(0.0)
+                sdate.append(101)
+                edate.append(1231)
     else:                                                                      # otherwise set bypass rates to zero
         for dam in dams['dam_id']:
             rate.append(0.0)
+            sdate.append(101)
+            edate.append(1231)
     
     rate = pd.Series(rate, index=dams.index)                                   # convert to a series
     sdate = pd.Series(sdate, index=dams.index)
@@ -80,7 +90,7 @@ def STEDI_bypasses(params,dams):
     
     if 'bypass_minvol' in params.keys():                                       # filter if below min volume
         minvol = params['bypass_minvol']
-        filt = dams['volML'] <= minvol
+        filt = dams['vol_ML'] <= minvol
         rate.loc[filt] = 0.0
         
     if 'bypass_mincatch' in params.keys():                                     # filter if below min total upstream catch
@@ -104,17 +114,25 @@ def STEDI_winterfill(params,dams):
     sdate = []
     edate = []
     
-    for dam in dams['dam_id']:
-        sdate.append(params['wfill_start_mmdd'])
-        edate.append(params['wfill_end_mmdd'])
     
-    if params['dam_list_inc_wfill']:                                           # if the wfill rate is given in a list
-        rate = dams['wfill_MLperT'].to_list()
+    if 'dam_list_inc_wfill' in params.keys():
+        if params['dam_list_inc_wfill']:                                           # if the wfill rate is given in a list
+            rate = dams['wfill_MLperT'].to_list()
+            for dam in dams['dam_id']:
+                sdate.append(params['wfill_start_mmdd'])
+                edate.append(params['wfill_end_mmdd'])
         
+        else:                                                                      # otherwise set wfill rates to zero
+            for dam in dams['dam_id']:
+                rate.append(0.0)
+                sdate.append(101)
+                edate.append(1231)
     else:                                                                      # otherwise set wfill rates to zero
         for dam in dams['dam_id']:
             rate.append(0.0)
-    
+            sdate.append(101)
+            edate.append(1231)
+            
     rate = pd.Series(rate, index=dams.index)                                   # convert to a series
     sdate = pd.Series(sdate, index=dams.index)
     edate = pd.Series(edate, index=dams.index)
