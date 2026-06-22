@@ -18,9 +18,13 @@ REFERENCES:
 @author: robert.morden
 """
 
+import logging
 import pandas as pd
 import numpy as np
 from datetime import datetime
+
+
+logger = logging.getLogger(__name__)
 
 
 from .scenario import read_scenario_file
@@ -135,39 +139,34 @@ class tedimodel():
         self.indiv_results = pd.DataFrame(columns=cols).astype(dict(zip(cols,types)))
         
     def run_model(self):
-        #print('Let\'s pretend the model just ran. Process, process, kaboom. We are done.')
-        
         global_results, alldam_results = calc_dams(self)
         self.catch_results = global_results
         self.indiv_results = alldam_results
-        
+
         now = datetime.now()
         self.rundate = now.strftime('%Y-%m-%d %H:%M:%S')
-        
-        print(now.strftime('Success! Model run completed on %Y-%m-%d at %H:%M:%S.'))
-    
+
+        logger.info('Model run completed on %s', self.rundate)
+
     def save_results_global(self,outfile):
-        #print(f'Let\'s pretend the global results just saved to the file {outfile}.')
         write_results_global(self,outfile)
-        print(f'Success! Global catchment water balance results saved to file: {outfile}')
-        
+        logger.info('Global catchment water balance results saved to file: %s', outfile)
+
     def save_results_individual(self,outfile):
-        #print(f'Let\'s pretend the individual dam results just saved to the file {outfile}.')
         write_results_individual(self,outfile)
-        print(f'Success! Individual dam water balance results saved to file: {outfile}')
-    
+        logger.info('Individual dam water balance results saved to file: %s', outfile)
+
     def save_model(self,fileprefix):
-        #print(f'Let\'s pretend the model parameters just saved to the file {fileprefix}.')
         save_pytedi_model(self,fileprefix)
-        print(f'Success! Model files saved with prefix: {fileprefix}')
+        logger.info('Model files saved with prefix: %s', fileprefix)
 
     def open_model(self,fileprefix):
-        print(f'Let\'s pretend a model was just read from files with the prefix {fileprefix}.')
+        logger.warning('open_model is not implemented yet (requested prefix: %s)', fileprefix)
         # model_dict = open_pytedi_model(fileprefix)
         # update model attributes
 
     def save_source_input(self,outfile):
-        print(f'Let\'s pretend a SOURCE input file was just saved to the file {outfile}.')
+        logger.warning('save_source_input is not implemented yet (requested file: %s)', outfile)
         
 # %%=======================================================================================================================
 def open_windows_STEDI_scenario(fname):
