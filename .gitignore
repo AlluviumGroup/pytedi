@@ -8,3 +8,10 @@ F8.cmn
 F8.fmn
 F8steadi_v1-24.scn
 pytedi_planning.py
+
+# Python packaging artifacts
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.py[cod]

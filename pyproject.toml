@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pytedi"
+version = "0.1.0"
+description = "Python Tool for Estimating Dam Impacts (TEDI)"
+readme = "readme.md"
+requires-python = ">=3.9"
+authors = [
+    { name = "Robert Morden" },
+    { name = "Ella Guthrie" },
+    { name = "Joel Rahman" },
+]
+dependencies = [
+    "pandas",
+    "numpy",
+    "numba",
+]
+
+[project.urls]
+Homepage = "https://github.com/robmorden/pytedi"
+
+[tool.setuptools.packages.find]
+include = ["pytedi*"]
+exclude = ["pytedi_planning*", "pytedi_testing*"]
