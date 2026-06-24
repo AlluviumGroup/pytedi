@@ -30,3 +30,9 @@ model_10days.damlist.loc[1,'output'] = 1
 model_10days.run_model()
 model_10days.save_results_global(r'C:\Users\robert.morden\OneDrive - Alluvium Consulting Australia\_Roberts stuff\Tools\Python\pytedi\pytedi_github\Out1_pytedi_10days.csv')
 model_10days.save_results_individual(r'C:\Users\robert.morden\OneDrive - Alluvium Consulting Australia\_Roberts stuff\Tools\Python\pytedi\pytedi_github\Out2_pytedi_10days.csv')
+
+fname = 'F1.scn'
+f1model,f1params = pytedi.open_windows_STEDI_scenario(fname)
+f1model.run_model()
+f1model.save_results_global(r'F1_pytedi_out_global.csv')
+f1model.save_results_individual(r'F1_pytedi_out_indiv.csv')

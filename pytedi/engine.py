@@ -174,8 +174,8 @@ def tedi_engine_down(flow,rain,evap,demd,years,monthday,history,dams,catcharea,i
     global_results = []
     alldam_results = []
     varyarea = store_params['vary_surfarea']
-    a = store_params['vol_surfarea_a']
-    b = store_params['vol_surfarea_b']
+    vsa_a = store_params['vol_surfarea_a']
+    vsa_b = store_params['vol_surfarea_b']
     
     # set up ENDstore array, set ENDstore = capacity
     estore = np.zeros(numdams)                                              
@@ -192,7 +192,7 @@ def tedi_engine_down(flow,rain,evap,demd,years,monthday,history,dams,catcharea,i
         yy = years[istep].item()
         mmdd = monthday[istep].item()
         
-        estore, singlestep_results, dam_results = stedi_engine_down_singlestep(f,r,e,dem,yy,mmdd,h,dams,catcharea,istep,sstore,True,varyarea,a,b)
+        estore, singlestep_results, dam_results = stedi_engine_down_singlestep(f,r,e,dem,yy,mmdd,h,dams,catcharea,istep,sstore,True,varyarea,vsa_a,vsa_b)
         global_results.extend(singlestep_results)
         alldam_results.extend(dam_results)
     
@@ -277,8 +277,8 @@ def tedi_engine_up(flow,rain,evap,demd,years,monthday,history,dams,catcharea,ist
     """
     numdams = len(dams)
     varyarea = store_params['vary_surfarea']
-    a = store_params['vol_surfarea_a']
-    b = store_params['vol_surfarea_b']
+    vsa_a = store_params['vol_surfarea_a']
+    vsa_b = store_params['vol_surfarea_b']
     
     # set up ENDstore array, set ENDstore = capacity
     estore = np.zeros(numdams)                                              
@@ -286,14 +286,15 @@ def tedi_engine_up(flow,rain,evap,demd,years,monthday,history,dams,catcharea,ist
     
     # set up basic parameters for the bisection
     increment = 2.0
-    tolerance = 0.1
+    maxmult = 10
+    tolerance = 0.02
     
     # set up results
     global_results = []
     alldam_results = []
 
     for istep in range(istart,iend+1):                                         # for each timestep in the useful range
-        
+        print(f'istep = {istep}')
         q_obs = flow[istep].item()                                             # define the observed downstream flow
         r = rain[istep].item()
         e = evap[istep].item()
@@ -306,31 +307,38 @@ def tedi_engine_up(flow,rain,evap,demd,years,monthday,history,dams,catcharea,ist
         
         a = q_obs
         iloop = 0
-        maxloops = 1000
+        maxloops = 10
         
-        x1,x2,x3 = stedi_engine_down_singlestep(a,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,False,varyarea,a,b)
-        diff_a = x2[6] - q_obs
+        outflowcol = 7      # this is the column number to get the downstream flow from the 'singlestep_results' array
+        
+        x1,x2,x3 = stedi_engine_down_singlestep(a,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,False,varyarea,vsa_a,vsa_b)
+        diff_a = x2[outflowcol] - q_obs
         b = a
         diff_b = diff_a
         if diff_a < 0:                                                         # if est - obs is negative, the starting flow was too low so we need to increase it
-            while diff_b < 0:
+            while (diff_b < 0) and (iloop<maxloops):
                 iloop += 1
                 b *= increment
-                x1,x2,x3 = stedi_engine_down_singlestep(b,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,False,varyarea,a,b)
-                diff_b = x2[6] - q_obs
+                x1,x2,x3 = stedi_engine_down_singlestep(b,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,False,varyarea,vsa_a,vsa_b)
+                diff_b = x2[outflowcol] - q_obs
+            if iloop == maxloops:
+                b = a * maxmult
         else:                                                                  # if est - obs is positive, the starting flow was too high so we need to decrease it
-            while (diff_b > 0) and (b > tolerance):
+            while (diff_b > 0) and (b > tolerance) and (iloop<maxloops):
                 iloop += 1
                 b /= increment
-                x1,x2,x3 = stedi_engine_down_singlestep(b,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,False,varyarea,a,b)
-                diff_b = x2[6] - q_obs
+                x1,x2,x3 = stedi_engine_down_singlestep(b,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,False,varyarea,vsa_a,vsa_b)
+                diff_b = x2[outflowcol] - q_obs
+            if iloop == maxloops:
+                b = 0
         
         iloop = 0
+        maxloops = 100
         while (abs(b - a) / 2 > tolerance) and (iloop<maxloops):                  # Now that f(a) and f(b) have opposite signs, we can apply the standard bisection algorithm
             iloop += 1    
             midpoint = (a + b) / 2
-            x1,x2,x3 = stedi_engine_down_singlestep(midpoint,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,False,varyarea,a,b)
-            diff_mid = x2[6] - q_obs
+            x1,x2,x3 = stedi_engine_down_singlestep(midpoint,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,False,varyarea,vsa_a,vsa_b)
+            diff_mid = x2[outflowcol] - q_obs
             if diff_mid == 0:                                                  # We've found an exact root. Cool!
                 a = midpoint
                 b = midpoint
@@ -341,7 +349,9 @@ def tedi_engine_up(flow,rain,evap,demd,years,monthday,history,dams,catcharea,ist
         
         flow_us = (a + b) / 2                                                  # The midpoint is the best estimate of the upstream flow
         
-        estore, singlestep_results, dam_results = stedi_engine_down_singlestep(flow_us,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,True,varyarea,a,b)
+        print(f'iloop = {iloop}, a = {a}, b = {b}')
+        
+        estore, singlestep_results, dam_results = stedi_engine_down_singlestep(flow_us,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,True,varyarea,vsa_a,vsa_b)
         global_results.extend(singlestep_results)
         alldam_results.extend(dam_results)
     
