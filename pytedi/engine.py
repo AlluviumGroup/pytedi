@@ -294,7 +294,7 @@ def tedi_engine_up(flow,rain,evap,demd,years,monthday,history,dams,catcharea,ist
     alldam_results = []
 
     for istep in range(istart,iend+1):                                         # for each timestep in the useful range
-        print(f'istep = {istep}')
+        #print(f'istep = {istep}')
         q_obs = flow[istep].item()                                             # define the observed downstream flow
         r = rain[istep].item()
         e = evap[istep].item()
@@ -349,7 +349,7 @@ def tedi_engine_up(flow,rain,evap,demd,years,monthday,history,dams,catcharea,ist
         
         flow_us = (a + b) / 2                                                  # The midpoint is the best estimate of the upstream flow
         
-        print(f'iloop = {iloop}, a = {a}, b = {b}')
+        #print(f'iloop = {iloop}, a = {a}, b = {b}')
         
         estore, singlestep_results, dam_results = stedi_engine_down_singlestep(flow_us,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,True,varyarea,vsa_a,vsa_b)
         global_results.extend(singlestep_results)

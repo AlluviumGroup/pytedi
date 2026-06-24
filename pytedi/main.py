@@ -33,7 +33,7 @@ from .bypasses import process_STEDI_bypasses
 from .climate import process_STEDI_climate
 from .demands import process_STEDI_demands
 from .engine import calc_dams
-from .data_io import write_results_global, write_results_individual, save_pytedi_model
+from .data_io import write_results_global, write_results_individual, save_pytedi_model, open_pytedi_model
 
 # %%=======================================================================================================================
 class tedimodel():
@@ -57,6 +57,8 @@ class tedimodel():
         vol_surfarea_b        float64                  Parameter b in the equaiton Vol = a x (surfacearea_m2 ^ b)
         startstore_propfull   float64                  Starting storage of all dams as a proportion of their capacity. Must be between 0 and 1 or will be clipped. (STEDI v1.2 default is 0.0)
         rundate               datetime                 date and time of last model run (nan if not run yet)
+        stedi_params          dict                     dictionary of all of the parameters read from a windows STEDI scenario file
+        pyparams              dict                     dictionary of all of the parameters read from a pytedi scenario file
         damlist               dataframe                List of dams in the catchment and their characteristics
             dam_id                integer                  dam unique id
             ds_dam_id             integer                  unique id of the dam downstream (-99 if none downstream)
@@ -140,6 +142,9 @@ class tedimodel():
         types = ['int32', 'int32','float32','float32',     'float32',    'float32','float32','float32','float32','float32','float32']   # first two columns are integers
         self.indiv_results = pd.DataFrame(columns=cols).astype(dict(zip(cols,types)))
         
+        self.pyparams = {}
+        self.stedi_params = {}
+        
     def run_model(self):
         global_results, alldam_results = calc_dams(self)
         self.catch_results = global_results
@@ -162,10 +167,36 @@ class tedimodel():
         save_pytedi_model(self,fileprefix)
         logger.info('Model files saved with prefix: %s', fileprefix)
 
-    def open_model(self,fileprefix):
-        logger.warning('open_model is not implemented yet (requested prefix: %s)', fileprefix)
-        # model_dict = open_pytedi_model(fileprefix)
+    def open_model(self,infile):
+        pyparams = open_pytedi_model(infile)
+        
         # update model attributes
+        self.model_title = pyparams['model_title']
+        self.model_timestep = pyparams['model_timestep']
+        self.calc_nat_or_obs = pyparams['calc_nat_or_obs']
+        self.cat_area_km2 = pyparams['cat_area_km2']
+        self.scale_limit = pyparams['scale_limit']
+        self.vary_surfarea = pyparams['vary_surfarea']
+        self.vol_surfarea_a = pyparams['vol_surfarea_a']
+        self.vol_surfarea_b = pyparams['vol_surfarea_b']
+        self.startstore_propfull = pyparams['startstore_propfull']
+        self.rundate = pyparams['rundate']
+        
+        self.damlist = pyparams['damlist']
+        self.histoscale = pyparams['histoscale']
+        self.ts = pyparams['ts']
+
+        cols = ['sstore', 'flow_up', 'netevap', 'demd_sum', 'wf', 'bp', 'estore', 'flow_down', 'agg_impact']
+        self.catch_results = pd.DataFrame(columns=cols,dtype='float32')
+
+        cols =  ['istep', 'idam', 'sstore', 'local_inflow','updam_spill','netevap','demand', 'wf',     'bp',     'es',     'outflow']
+        types = ['int32', 'int32','float32','float32',     'float32',    'float32','float32','float32','float32','float32','float32']   # first two columns are integers
+        self.indiv_results = pd.DataFrame(columns=cols).astype(dict(zip(cols,types)))
+        
+        self.pyparams = pyparams
+        self.stedi_params = {}
+        
+        logger.warning('Model file opened (requested prefix: %s)', infile)
 
     def save_source_input(self,outfile):
         logger.warning('save_source_input is not implemented yet (requested file: %s)', outfile)
@@ -233,6 +264,10 @@ def open_windows_STEDI_scenario(fname):
     
     # add demand timeseries to ts
     model.ts = model.ts.join(d_ts)
+    
+    # add parameters read from file
+    model.pyparams = {}
+    model.stedi_params = stedi_params
     
     logger.info('Model created: %s', model.title)
     

@@ -36,3 +36,10 @@ f1model,f1params = pytedi.open_windows_STEDI_scenario(fname)
 f1model.run_model()
 f1model.save_results_global(r'F1_pytedi_out_global.csv')
 f1model.save_results_individual(r'F1_pytedi_out_indiv.csv')
+
+fname = 'F4_damlist.scn'
+f4model,f4params = pytedi.open_windows_STEDI_scenario(fname)
+f4model.run_model()
+f4model.save_results_global(r'F4_pytedi_out_global.csv')
+f4model.save_results_individual(r'F4_pytedi_out_indiv.csv')
+f4model.save_model('F4_pytedi_model')
