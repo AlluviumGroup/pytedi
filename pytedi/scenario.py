@@ -69,13 +69,14 @@ def read_scenario_winstedi_v1(scenfile):
     with open(scenfile, encoding='latin-1') as stream:
         for line in stream:
             
-            match line.strip().lower():
+            line_strip_lower = line.strip().casefold()
+            match line_strip_lower:
                 
                 case "scenario title:":
                     params['title'] = next(stream).strip()
                 
                 case "calculation timestep:":
-                    txt1 = next(stream).strip().lower()
+                    txt1 = next(stream).strip().casefold()
                     if txt1 == 'daily':
                         params['timestep'] = 'day'
                     elif txt1 == 'monthly':
@@ -84,14 +85,14 @@ def read_scenario_winstedi_v1(scenfile):
                         raise IOError(f"ERROR - The scenario uses a {txt1} timestep which is not compatible with pytedi.")
                 
                 case "calculation method - calculate natural given observed?:":
-                    txt1 = next(stream).strip().lower()
+                    txt1 = next(stream).strip().casefold()
                     if txt1 == 'true':
                         params['calc_nat_or_obs'] = 'nat'
                     else:
                         params['calc_nat_or_obs'] = 'obs'
                     
-                case "catchment area (km²):":
-                    txt1 = next(stream).strip().lower()
+                case _ if "catchment area (km" in line_strip_lower:            #"catchment area (km²):":     # the superscript 2 is a problem
+                    txt1 = next(stream).strip().casefold()
                     params['cat_area_km2'] = float(txt1)
                     
                 case "input flow file:":
@@ -113,7 +114,7 @@ def read_scenario_winstedi_v1(scenfile):
                     params['input_evap_field'] = int(txt2)
                     
                 case "enter details of each dam individually?:":
-                    txt1 = next(stream).strip().lower()
+                    txt1 = next(stream).strip().casefold()
                     if txt1 == 'true':
                         params['dam_dist_or_list'] = 'list'
                     else:
@@ -183,7 +184,7 @@ def read_scenario_winstedi_v1(scenfile):
                     params['demand_ngroups'] = int(txt1)
                     
                 case "employ volume threshold between demand groups:":
-                    txt1 = next(stream).strip().lower()
+                    txt1 = next(stream).strip().casefold()
                     if txt1 == 'true':
                         params['demand_group_method'] = 'vol'
                     else:
@@ -296,10 +297,10 @@ def read_scenario_winstedi_v1(scenfile):
                     params['dam_dist_or_list'] = 'list'
                     while reading_dam_details:
                         line = next(stream).strip()
-                        match line[:30].strip().lower():                             # only read the first 30 characters - lots of data on the same line
+                        match line[:30].strip().casefold():                             # only read the first 30 characters - lots of data on the same line
                             
                             case 'multiple demand groups?':
-                                txt1 = line[38:].strip().lower()
+                                txt1 = line[38:].strip().casefold()
                                 if txt1 == 'true':
                                     params['dam_list_inc_demgroups'] = True
                                     params['demand_group_method'] = 'list'
@@ -312,7 +313,7 @@ def read_scenario_winstedi_v1(scenfile):
                             case 'winterfill pumping?':
                                 txt1 = line[38:]
                                 parts = txt1.split()
-                                if parts[0].strip().lower() == 'true':
+                                if parts[0].strip().casefold() == 'true':
                                     params['dam_list_inc_wfill'] = True
                                     params['wfill_start_mmdd'] = int(parts[1])
                                     params['wfill_end_mmdd'] = int(parts[2])
@@ -322,7 +323,7 @@ def read_scenario_winstedi_v1(scenfile):
                             case 'low flow bypasses?':
                                 txt1 = line[38:]
                                 parts = txt1.split()
-                                if parts[0].strip().lower() == 'true':
+                                if parts[0].strip().casefold() == 'true':
                                     params['dam_list_inc_bypass'] = True
                                     params['bypass_start_mmdd'] = int(parts[1])
                                     params['bypass_end_mmdd'] = int(parts[2])
@@ -330,7 +331,7 @@ def read_scenario_winstedi_v1(scenfile):
                                     params['dam_list_inc_bypass'] = False
                                 
                             case 'spatial networking?':
-                                txt1 = line[38:].strip().lower()
+                                txt1 = line[38:].strip().casefold()
                                 if txt1 == 'true':
                                     params['dam_list_inc_network'] = True
                                 else:

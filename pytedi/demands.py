@@ -226,6 +226,7 @@ The output is a DataFrame with a single column per pattern.
 def dempatterns_file(params):
     
     fname = params['dem_pattern_file']
+    altpath = params['fpath']
     tstep = params['timestep']
     ngroups = params['demand_ngroups']
     field_df = params['dem_pattern_field_table']
@@ -233,11 +234,81 @@ def dempatterns_file(params):
     patterns = {}
     
     for i in range(ngroups):
-        ifield = field_df.iloc[i,1]
-        group_name = field_df.iloc[i,1]
-        pattern = read_STEDI_clim(fname,ifield,tstep)
+        ifield = field_df.iloc[i,1]                                            # get the field number
+        group_name = field_df.iloc[i,0]                                        # get the name of the demand (eg. irrigation)
+        pattern = read_STEDI_clim(fname,ifield,tstep,altpath)
         patterns[group_name] = pattern
     
-    df_patt = pd.DataFrame(patterns)
+    df_patt = pd.DataFrame(patterns,dtype='float64')
+    df_patt_transf = transform_patterns(df_patt)
     
-    return df_patt
+    return df_patt_transf
+
+# %%=====================================================================================================================
+"""
+For each column in df_patt, divide values by that column's mean annual total.
+
+Mean annual total is calculated using only complete calendar years:
+- daily data: year must contain every day in that calendar year
+- monthly data: year must contain Jan-Dec, with dates at month start
+- values must be non-null for the full calendar year
+
+Fallback if no complete valid calendar years exist for a column:
+- daily: divide by column.sum() / 365.25
+- monthly: divide by column.sum() / 12
+"""
+
+def transform_patterns(df_patt):
+
+    # Infer whether daily or monthly
+    idx = df_patt.index
+
+    if len(idx) < 2:
+        raise ValueError("Need at least two dates to infer daily or monthly frequency")
+
+    if idx.is_month_start.all():
+        # Treat as monthly if all timestamps are at the start of a month
+        freq = "monthly"
+    else:
+        # Otherwise assume daily, but check that all timestamps are day-level
+        freq = "daily"
+
+    out = df_patt.copy()
+
+    for col in df_patt.columns:
+        s = df_patt[col]
+
+        annual_totals = []
+
+        for year, sy in s.groupby(s.index.year):
+            sy = sy.sort_index()
+
+            if freq == "daily":
+                expected_index = pd.date_range(
+                    start=f"{year}-01-01",
+                    end=f"{year}-12-31",
+                    freq="D",
+                )
+
+            elif freq == "monthly":
+                expected_index = pd.date_range(
+                    start=f"{year}-01-01",
+                    end=f"{year}-12-01",
+                    freq="MS",
+                )
+
+            # Only use whole calendar years with all dates present
+            if sy.index.equals(expected_index) and sy.notna().all():
+                annual_totals.append(sy.sum())
+
+        if annual_totals:
+            divisor = np.mean(annual_totals)
+        else:
+            if freq == "daily":
+                divisor = s.mean(skipna=True) * 365.25
+            else:
+                divisor = s.mean(skipna=True) * 12
+
+        out[col] = s / divisor
+
+    return out

@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import importlib
 import pytedi
 importlib.reload(pytedi)
@@ -21,3 +22,11 @@ cbup.save_results_global('cbup_catchment_results.csv')
 cbup.save_results_individual('cbup_individualdam_results.csv')
 cbup.save_model('cbup_model')
 
+fname = r'C:\Users\robert.morden\OneDrive - Alluvium Consulting Australia\_Roberts stuff\Tools\Python\pytedi\pytedi_github\10days.scn'
+model_10days,params = pytedi.open_windows_STEDI_scenario(fname)
+model_10days.damlist.loc[1,'output'] = 1
+# x = model_10days.damlist.loc[:,'catchuplocal_km2']
+# model_10days.damlist.loc[:,'catchuplocal_km2'] = np.trunc(x*100)/100
+model_10days.run_model()
+model_10days.save_results_global(r'C:\Users\robert.morden\OneDrive - Alluvium Consulting Australia\_Roberts stuff\Tools\Python\pytedi\pytedi_github\Out1_pytedi_10days.csv')
+model_10days.save_results_individual(r'C:\Users\robert.morden\OneDrive - Alluvium Consulting Australia\_Roberts stuff\Tools\Python\pytedi\pytedi_github\Out2_pytedi_10days.csv')

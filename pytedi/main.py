@@ -35,12 +35,6 @@ from .demands import process_STEDI_demands
 from .engine import calc_dams
 from .data_io import write_results_global, write_results_individual, save_pytedi_model
 
-
-
-# pytedi_version = '0.1' 
-# pytedi_date = 'June 2026'
-# pytedi_authors = 'Robert Morden and Ella Guthrie (Alluvium Consulting) and Joel Rahman (Flow Matters)'
-
 # %%=======================================================================================================================
 class tedimodel():
 
@@ -58,6 +52,10 @@ class tedimodel():
         calc_nat_or_obs       string ('nat'/'obs')     Direction of calculation (calculate upstream natural, or downstream observed)
         cat_area_km2          float64                  Total catchment area in km2
         scale_limit           float64                  If local areas for each dam sum to more than cat_area_km2 x scale limit, the areas will be proprtionally reduced.
+        vary_surfarea         boolean                  If true, vary the surface area based on parameters a and b. If false, assume surface area is the maximum at all times. (STEDI default is false)
+        vol_surfarea_a        float64                  Parameter a in the equaiton Vol = a x (surfacearea_m2 ^ b)
+        vol_surfarea_b        float64                  Parameter b in the equaiton Vol = a x (surfacearea_m2 ^ b)
+        startstore_propfull   float64                  Starting storage of all dams as a proportion of their capacity. Must be between 0 and 1 or will be clipped. (STEDI v1.2 default is 0.0)
         rundate               datetime                 date and time of last model run (nan if not run yet)
         damlist               dataframe                List of dams in the catchment and their characteristics
             dam_id                integer                  dam unique id
@@ -75,7 +73,7 @@ class tedimodel():
             wfill_MLperT          float64                  bypass flow rate in ML per day/month
             wfill_start_ddmm      integer                  start date of bypass (eg. 1 Jan = 0101, 15th July = 1507)
             wfill_end_ddmm        integer                  end date of bypass (eg. 1 Jan = 0101, 15th July = 1507)
-            output                integer                  flag = 1 to produce water balance results for this dam, or 0 otherwise
+            output                integer                  flag = 1 to produce water balance results for this dam, or anything else otherwise
         histoscale            dataframe                Timeseries of historic scaling factors to apply (eg. 01/01/1950 = 0.0, 1/1/2010 = 1.0, 1/1/2050 = 1.0)
         ts                    dataframe                Timeseries of demand, climate, and flow
             demands               float64                  Timeseries of demand patterns, 1 column per demand type
@@ -111,6 +109,10 @@ class tedimodel():
         self.calc_nat_or_obs = 'obs'
         self.cat_area_km2 = 1.0
         self.scale_limit = 0.8
+        self.vary_surfarea = False
+        self.vol_surfarea_a = 0.0001042          # Fowler et al. (2015) equation 1 is the latest for Victoria
+        self.vol_surfarea_b = 1.3213             # Fowler et al. (2015) equation 1 is the latest for Victoria
+        self.startstore_propfull = 0.0
         self.rundate = np.nan
         
         cols =  ['dam_id',          'ds_damid',     'surfacearea_m2',    'catchuptotal_km2', 'catchuplocal_km2',  'vol_ML',          
@@ -131,11 +133,11 @@ class tedimodel():
         cols = ['rain', 'evap', 'flowup', 'flowdown']
         self.ts = pd.DataFrame(columns=cols,dtype='float32')
 
-        cols = ['sstore', 'flow_up', 'netevap', 'demd_sum', 'bp', 'estore', 'flow_down', 'agg_impact']
+        cols = ['sstore', 'flow_up', 'netevap', 'demd_sum', 'wf', 'bp', 'estore', 'flow_down', 'agg_impact']
         self.catch_results = pd.DataFrame(columns=cols,dtype='float32')
 
-        cols =  ['istep', 'idam', 'sstore', 'local_inflow','updam_spill','netevap','demand', 'bp',     'es',     'outflow']
-        types = ['int32', 'int32','float32','float32',     'float32',    'float32','float32','float32','float32','float32']   # first two columns are integers
+        cols =  ['istep', 'idam', 'sstore', 'local_inflow','updam_spill','netevap','demand', 'wf',     'bp',     'es',     'outflow']
+        types = ['int32', 'int32','float32','float32',     'float32',    'float32','float32','float32','float32','float32','float32']   # first two columns are integers
         self.indiv_results = pd.DataFrame(columns=cols).astype(dict(zip(cols,types)))
         
     def run_model(self):
@@ -172,14 +174,19 @@ class tedimodel():
 def open_windows_STEDI_scenario(fname):
     
     stedi_params = read_scenario_file(fname)                                   # open the STEDI file and read the information     DONE
+    logger.info('Read windows STEDI scenario file: %s', fname)
     
     dams = process_STEDI_dams(stedi_params)                                    # make sense of the dams                           DONE
+    logger.info('Processed the list of dams...')
     
     bpass,wfill = process_STEDI_bypasses(stedi_params,dams)                    # make sense of the bypasses                       DONE
-
+    logger.info('Processed bypass and winterfill details...')
+    
     clim = process_STEDI_climate(stedi_params)                                 # make sense of the climate                        DONE
+    logger.info('Processed rainfall and evaporation...')
     
     d_ts, d_groups, d_factors = process_STEDI_demands(stedi_params,dams,clim)  # make sense of the demands                        DONE
+    logger.info('Processed demand details...')
     
     # define variable as a 'tedimodel' object
     model = tedimodel()
@@ -189,6 +196,10 @@ def open_windows_STEDI_scenario(fname):
     model.timestep = stedi_params['timestep']
     model.calc_nat_or_obs = stedi_params['calc_nat_or_obs']
     model.cat_area_km2 = stedi_params['cat_area_km2']
+
+    if 'vol_surfarea_a' in stedi_params.keys():
+        model.vol_surfarea_a = stedi_params['vol_surfarea_a']
+        model.vol_surfarea_b = stedi_params['vol_surfarea_b']
     
     # add dam list
     model.damlist['dam_id'] = dams.loc[:,'dam_id']
@@ -222,7 +233,9 @@ def open_windows_STEDI_scenario(fname):
     
     # add demand timeseries to ts
     model.ts = model.ts.join(d_ts)
-        
+    
+    logger.info('Model created: %s', model.title)
+    
     return model, stedi_params          # can comment out the stedi_params when testing is complete
 
 # %%=======================================================================================================================
