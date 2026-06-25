@@ -27,7 +27,9 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
-from .scenario import read_scenario_file
+import os
+
+from .scenario import read_scenario_file, read_STEDI_network_output, full_group_name
 from .damslist import process_STEDI_dams
 from .bypasses import process_STEDI_bypasses
 from .climate import process_STEDI_climate
@@ -202,11 +204,77 @@ class tedimodel():
         logger.warning('save_source_input is not implemented yet (requested file: %s)', outfile)
         
 # %%=======================================================================================================================
-def open_windows_STEDI_scenario(fname):
-    
+def _resolve_network_out_path(network_from_out, scnfile, params):
+    '''Find the STEDI .out file. If network_from_out is a path, use it; if True,
+    use the scenario's recorded output file. In either case, if the path does not
+    exist (eg. a dead 'S:\\...' reference), fall back to <scn_dir>/<basename>.'''
+    scn_dir = os.path.dirname(os.path.abspath(scnfile))
+
+    if isinstance(network_from_out, str):
+        candidate = network_from_out
+    elif 'output_file' in params:
+        candidate = params['output_file']
+    else:
+        raise IOError('network_from_out=True but the scenario has no "Output file (full):" entry; pass an explicit .out path.')
+
+    if os.path.exists(candidate):
+        return candidate
+
+    fallback = os.path.join(scn_dir, os.path.basename(candidate))              # dead absolute path -> look beside the .scn
+    if os.path.exists(fallback):
+        logger.warning('STEDI output file not found at "%s"; inferring "%s" from the scenario directory instead.', candidate, fallback)
+        return fallback
+
+    raise IOError(f'STEDI output (.out) file not found: {candidate}')
+
+# %%=======================================================================================================================
+def _inject_network_into_params(params, net):
+    '''Configure a STEDI params dict to use an explicit imported dam network
+    (from read_STEDI_network_output) in place of the volume distribution.'''
+    if 'dem_12m_patterns' in params:
+        full_names = params['dem_12m_patterns']['Name'].tolist()
+    elif 'dem_pattern_field_table' in params:
+        full_names = params['dem_pattern_field_table']['Name'].tolist()
+    else:
+        full_names = []
+
+    net = net.copy()
+    net['group_name'] = net['group_name'].apply(lambda g: full_group_name(g, full_names))
+
+    params['damlist'] = net
+    params['dam_dist_or_list'] = 'list'
+    params['demand_group_method'] = 'list'
+    params['dam_list_inc_network'] = True                                      # preserve the local areas computed from the network
+    params['dam_list_inc_bypass'] = True                                       # use the per-dam bypass / winterfill rates from the .out
+    params['dam_list_inc_wfill'] = True
+    params.pop('bypass_MLperTperKM2', None)                                    # do not re-derive bypass from a global rate
+    params.setdefault('bypass_start_mmdd', 101)
+    params.setdefault('bypass_end_mmdd', 1231)
+    params.setdefault('wfill_start_mmdd', 101)
+    params.setdefault('wfill_end_mmdd', 1231)
+
+# %%=======================================================================================================================
+def open_windows_STEDI_scenario(fname, network_from_out=None):
+    '''
+    Open a windows STEDI scenario (.scn) file and build a tedimodel.
+
+    By default the dam population is regenerated from the scenario's volume
+    distribution (a fresh random sample that will not match the original STEDI
+    run). Pass network_from_out to instead import STEDI's *actual* generated dam
+    network from its detailed-output (.out) file, which reproduces the STEDI run:
+
+        network_from_out=True       -> auto-locate the .out beside the .scn
+        network_from_out="path.out" -> use the given .out file
+    '''
     stedi_params = read_scenario_file(fname)                                   # open the STEDI file and read the information     DONE
     logger.info('Read windows STEDI scenario file: %s', fname)
-    
+
+    if network_from_out is not None:                                           # use the explicit STEDI network instead of the distribution
+        out_path = _resolve_network_out_path(network_from_out, fname, stedi_params)
+        net = read_STEDI_network_output(out_path)
+        _inject_network_into_params(stedi_params, net)
+        logger.info('Using explicit STEDI network (%d dams) from %s', len(net), out_path)
+
     dams = process_STEDI_dams(stedi_params)                                    # make sense of the dams                           DONE
     logger.info('Processed the list of dams...')
     

@@ -15,6 +15,86 @@ Users can convert old windows STEDI and TEDI files for use with pyTEDI.
 import pandas as pd
 #import numpy as np
 import os
+import logging
+
+logger = logging.getLogger(__name__)
+
+# %%=====================================================================================================================
+def read_STEDI_network_output(out_file):
+    '''
+    Read the explicit dam network from a Windows STEDI detailed-output (.out) file.
+
+    The .out file lists the actual generated dam network in a node table (one row
+    per node), giving each dam's surface area, capacity, total upstream catchment
+    area, downstream node, demand group, and bypass/winterfill rates. Importing
+    this lets pytedi reproduce a STEDI run exactly, instead of regenerating a
+    (different) random dam population from the scenario's volume distribution.
+
+    Parameters
+    ----------
+    out_file : str
+        Path to a STEDI '..._out.out' detailed calculation file.
+
+    Returns
+    -------
+    damlist : DataFrame
+        One row per dam (the catchment outlet is excluded), with columns:
+        dam_id, ds_damid, surfacearea_m2, vol_ML, catchuptotal_km2,
+        catchuplocal_km2, group_name, bypass_MLperT, wfill_MLperT.
+        Demand group names are as written in the node table (they may be
+        truncated; callers map them to full names). ds_damid is -99 for dams
+        flowing to the catchment outlet.
+    '''
+    outlet_id = None
+    recs = []
+    with open(out_file, encoding='latin-1') as f:
+        for line in f:
+            t = line.split()
+            if len(t) >= 2 and t[1] == 'Outlet':                               # the outlet row identifies the outlet node id
+                try:
+                    outlet_id = int(t[0])
+                except ValueError:
+                    pass
+            elif len(t) >= 14 and t[1] == 'Dam':                               # dam rows have all columns populated (14 tokens)
+                try:
+                    recs.append({'dam_id':           int(t[0]),
+                                 'next_node':         int(t[2]),
+                                 'surfacearea_m2':    float(t[3]),
+                                 'vol_ML':            float(t[4]),
+                                 'catchuptotal_km2':  float(t[7]),
+                                 'bypass_MLperT':     float(t[10]),
+                                 'wfill_MLperT':      float(t[11]),
+                                 'group_name':        t[12]})
+                except ValueError:
+                    pass
+
+    if not recs:
+        raise IOError(f'No STEDI dam network table found in {out_file}')
+
+    df = pd.DataFrame(recs)
+
+    # dams flowing to the outlet use the pytedi convention ds_damid = -99
+    df['ds_damid'] = df['next_node'].where(df['next_node'] != outlet_id, -99)
+
+    # local area = total upstream area minus the total area of dams immediately upstream
+    up_area = df.groupby('next_node')['catchuptotal_km2'].sum()
+    df['catchuplocal_km2'] = df['catchuptotal_km2'] - df['dam_id'].map(up_area).fillna(0.0)
+
+    logger.info('Read explicit STEDI network (%d dams) from %s', len(df), out_file)
+
+    cols = ['dam_id', 'ds_damid', 'surfacearea_m2', 'vol_ML', 'catchuptotal_km2',
+            'catchuplocal_km2', 'group_name', 'bypass_MLperT', 'wfill_MLperT']
+    return df[cols]
+
+# %%=====================================================================================================================
+def full_group_name(label, full_names):
+    '''Map a (possibly truncated) demand group label from a STEDI .out node table
+    back to the matching full demand group name from the scenario. Returns the
+    label unchanged if no full name starts with it.'''
+    for fn in full_names:
+        if fn == label or fn.startswith(label):
+            return fn
+    return label
 
 # %%=====================================================================================================================
 def read_scenario_file(scenfile):
@@ -74,6 +154,9 @@ def read_scenario_winstedi_v1(scenfile):
                 
                 case "scenario title:":
                     params['title'] = next(stream).strip()
+
+                case "output file (full):":
+                    params['output_file'] = next(stream).strip()
                 
                 case "calculation timestep:":
                     txt1 = next(stream).strip().casefold()
