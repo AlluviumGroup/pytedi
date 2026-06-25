@@ -51,7 +51,7 @@ def process_STEDI_climate(params):
 
 # %%=====================================================================================================================
 def read_STEDI_clim(fname,ifield,tstep,altpath):
-    '''
+    r'''
     This function reads a fixed width file and gets the 'ifield' column.
     This might be easier with pd.read_fwf, but there could be multiple
     comment characters which read_fwf can't deal with.
@@ -72,12 +72,19 @@ def read_STEDI_clim(fname,ifield,tstep,altpath):
     if fpath.exists():                                                         # assume absolute file path
         fileexists = True
         f = fname
-    
+
     elif not fpath.is_absolute():                                              # try adding the scenario file path to it
         fmod = altpath / fpath
         if fmod.exists():
             fileexists = True
             f = str(fmod)
+
+    if not fileexists:                                                         # dead absolute path (eg. former 'S:\...' drive)?
+        fmod = altpath / fpath.name                                           # fall back to <scenario dir>/<basename>
+        if fmod.exists():
+            fileexists = True
+            f = str(fmod)
+            logger.warning('Input file not found at "%s"; inferring "%s" from the scenario directory instead.', fname, f)
             
     # if the file exists, go ahead and process it
     if fileexists:
