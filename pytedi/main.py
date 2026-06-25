@@ -171,8 +171,8 @@ class tedimodel():
         pyparams = open_pytedi_model(infile)
         
         # update model attributes
-        self.model_title = pyparams['model_title']
-        self.model_timestep = pyparams['model_timestep']
+        self.title = pyparams['model_title']
+        self.timestep = pyparams['model_timestep']
         self.calc_nat_or_obs = pyparams['calc_nat_or_obs']
         self.cat_area_km2 = pyparams['cat_area_km2']
         self.scale_limit = pyparams['scale_limit']

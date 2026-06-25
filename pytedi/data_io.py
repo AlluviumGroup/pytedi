@@ -98,47 +98,49 @@ def save_pytedi_model(model,outfile):
     toolauth = config.pytedi_authors
     
     histdates = model.histoscale.index.strftime("%Y-%m-%d")
-    joindates = ", ".join(histdates)
+    joindates = ", ".join(f'"{d}"' for d in histdates)
     histfactors = model.histoscale['histoscale'].to_list()
     joinfactors = ", ".join(str(f) for f in histfactors)
-    
-    toml_str = f"""# pytedi - Python tool for estimating dam impacts
-    # ===============================================
-    #
-    # Version {toolvers} - {tooldate}
-    # Authors - {toolauth}
-    #
-    # -----------------------
-    # MODEL FILE - PARAMETERS
-    # -----------------------
-    #
-    
-    model_title =                     "{model.title}"
-    
-    model_timestep =                  "{model.timestep}"
-    
-    calculating_natural_or_observed = "{model.calc_nat_or_obs}"
-    
-    total_catchment_area =            {model.cat_area_km2}
-    
-    scale_limit =                     {model.scale_limit}
-    
-    variable_surface_areas =          {model.vary_surfarea}
-    
-    volume_to_surfarea_a =            {model.vol_surfarea_a}
-    volume_to_surfarea_b =            {model.vol_surfarea_b}
-    
-    starting_storage_proportion =     {model.startstore_propfull}
 
-    date_last_run =                   {model.rundate}
-    
-    damlist_file =                    "{dam_file}"
-    
-    timeseries_file =                 "{ts_file}"
-    
-    historical_scaling_dates   =      [{joindates}]
-    historical_scaling_factors =      [{joinfactors}]
-    """
+    vary_surfarea_toml = str(bool(model.vary_surfarea)).lower()                 # TOML booleans are lowercase true/false
+
+    toml_str = f"""# pytedi - Python tool for estimating dam impacts
+# ===============================================
+#
+# Version {toolvers} - {tooldate}
+# Authors - {toolauth}
+#
+# -----------------------
+# MODEL FILE - PARAMETERS
+# -----------------------
+#
+
+model_title =                     "{model.title}"
+
+model_timestep =                  "{model.timestep}"
+
+calculating_natural_or_observed = "{model.calc_nat_or_obs}"
+
+total_catchment_area =            {model.cat_area_km2}
+
+scale_limit =                     {model.scale_limit}
+
+variable_surface_areas =          {vary_surfarea_toml}
+
+volume_to_surfarea_a =            {model.vol_surfarea_a}
+volume_to_surfarea_b =            {model.vol_surfarea_b}
+
+starting_storage_proportion =     {model.startstore_propfull}
+
+date_last_run =                   "{model.rundate}"
+
+damlist_file =                    '{dam_file}'
+
+timeseries_file =                 '{ts_file}'
+
+historical_scaling_dates   =      [{joindates}]
+historical_scaling_factors =      [{joinfactors}]
+"""
     
     # Write the TOML file
     with open(param_file, "w") as f:
@@ -180,7 +182,7 @@ def save_pytedi_model(model,outfile):
     
     # Write the file
     with open(dam_file, "w") as f:
-        f.write(head_str)
+        f.write(_strip_line_indents(head_str))                                 # '#' must be at column 0 so pandas comment='#' skips it
         model.damlist.to_csv(f, lineterminator='\n')
         
     head_str = f"""# pytedi - Python tool for estimating dam impacts
@@ -207,7 +209,7 @@ def save_pytedi_model(model,outfile):
     
     # Write the file
     with open(ts_file, "w") as f:
-        f.write(head_str)
+        f.write(_strip_line_indents(head_str))                                 # '#' must be at column 0 so pandas comment='#' skips it
         model.ts.to_csv(f, lineterminator='\n')
     
     # Read it back
@@ -320,11 +322,19 @@ def add_suffix_to_filename(filename, suffix, extension):
         ext = extension
     return f"{base}_{suffix}.{ext}"
 
+# %%=======================================================================================================================
+def _strip_line_indents(text):
+    '''Remove leading whitespace from every line so that '#' comment markers sit
+    at column 0. Header blocks are built from indented triple-quoted f-strings;
+    without this, pandas read_csv(comment='#') fails to skip the header.'''
+    trailing = "\n" if text.endswith("\n") else ""
+    return "\n".join(line.lstrip() for line in text.splitlines()) + trailing
+
 #%%========================================================================================================================
 def open_pytedi_model(outfile):
     
-    # open the parameters file
-    with open(outfile,"r") as f:
+    # open the parameters file (tomllib requires a binary stream)
+    with open(outfile,"rb") as f:
         toml_data_read = tomllib.load(f)
 
     pyparams = {}
@@ -345,18 +355,19 @@ def open_pytedi_model(outfile):
     histodates = toml_data_read["historical_scaling_dates"]
     histofactors = toml_data_read["historical_scaling_factors"]
     
-    histoscale = pd.DataFrame(index=pd.DatetimeIndex(pd.to_datetime(histodates)),columns=['histoscale'])
+    histoscale = pd.DataFrame({'histoscale': np.asarray(histofactors, dtype='float64')},
+                              index=pd.DatetimeIndex(pd.to_datetime(histodates)))
     histoscale.index.name = 'Date'
-    histoscale.loc[:,'histoscale'] = histofactors
     pyparams['histoscale'] = histoscale
     
-    # open the dam list file
-    types = ['int32',           'int32',         'float64',           'float64',         'float64',           'float64',         
-             'int32',           'string',        'float64',           'float64',         'int32', 
-             'int32',           'float64',       'int32',             'int32',           'int32']
-    pyparams['damlist'] = pd.read_csv(pyparams['dam_file'],index_col=0,dtypes=types)
-    
-    # open the timeseries file
-    pyparams['ts'] = pd.read_csv(pyparams['ts_file'],index_col=0, parse_dates=[0], dtype=np.float64)
+    # open the dam list file (skip the leading '#' comment header). Only group_name
+    # is pinned; integer-like columns (e.g. 'output', 'year_start') may legitimately
+    # contain NaN, so let pandas infer numeric dtypes rather than forcing int.
+    pyparams['damlist'] = pd.read_csv(pyparams['dam_file'], index_col=0, comment='#',
+                                      dtype={'group_name': 'string'})
+
+    # open the timeseries file (skip the leading '#' comment header)
+    pyparams['ts'] = pd.read_csv(pyparams['ts_file'], index_col=0, comment='#',
+                                 parse_dates=[0], dtype=np.float64)
     
     return pyparams
