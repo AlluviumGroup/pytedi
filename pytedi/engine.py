@@ -130,73 +130,53 @@ def calc_from_up_to_down(damlist_df, demands_df, rain_df, evap_df, flowin_df, ca
     iend = flowin_df.index.get_loc(dtend)
     
     # run calculations
-    global_results, alldam_results = tedi_engine_down(flow_array, rain_array, evap_array, demd_array, year_array, mmdd_array, history_array, damlist_array, cat_area, istart, iend, store_params)
-    
-    # reformat global results from a VERY long list to a sensible dataframe
-    global_results_columns = ['sstore', 'flow_up', 'netevap', 'demd_sum', 'wf', 'bp', 'estore', 'flow_down', 'agg_impact']
-    n = len(global_results) // len(global_results_columns)
-    global_results_array = np.array(global_results,dtype=np.float64)
-    new_array = global_results_array.reshape(n, len(global_results_columns))
-    global_results = pd.DataFrame(new_array,columns=global_results_columns,index=flowin_df.index)
-    
-    # reformat individual dam results from a VERY long list to a sensible dataframe
-    alldam_results_columns = ['istep','idam','sstore','local_inflow','updam_spill','netevap','demand','wf','bp','es','outflow']
-    n = len(alldam_results) // len(alldam_results_columns)
-    alldam_results_array = np.array(alldam_results,dtype=np.float64)
-    new_array = alldam_results_array.reshape(n, len(alldam_results_columns))
-    alldam_results = pd.DataFrame(new_array, columns=alldam_results_columns)
-    alldam_results['istep'] = alldam_results['istep'].astype(int)
-    alldam_results['idam'] = alldam_results['idam'].astype(int)
-    alldam_results['date'] = alldam_results['istep'].apply(lambda x: flowin_df.index[x])
-    columns_order = ['istep', 'idam', 'date', 'sstore', 'local_inflow', 'updam_spill', 'netevap', 'demand', 'wf', 'bp', 'es', 'outflow']
-    alldam_results = alldam_results[columns_order]
+    global_array, alldam_array = tedi_engine_down(flow_array, rain_array, evap_array, demd_array, year_array, mmdd_array, history_array, damlist_array, cat_area, istart, iend,
+                                                  store_params['vary_surfarea'], store_params['vol_surfarea_a'], store_params['vol_surfarea_b'], store_params['startstore_propfull'])
+
+    global_results, alldam_results = _format_engine_results(global_array, alldam_array, flowin_df.index)
 
     return global_results, alldam_results
 
 # %%=======================================================================================================================
-#@jit (nopython=True)
-def tedi_engine_down(flow,rain,evap,demd,years,monthday,history,dams,catcharea,istart,iend,store_params):
-        
+@jit (nopython=True, cache=True)
+def tedi_engine_down(flow,rain,evap,demd,years,monthday,history,dams,catcharea,istart,iend,varyarea,vsa_a,vsa_b,startprop):
+
     """
-    Calculate farm dam impacts on flow (the JIT decorator should get it up to warp speed 9)
-    
-    Takes the following inputs:
-        flow / rain / evap / demd  (1d numpy array, one row per timestep, all units ML or mm)
-        ymd                        (2d numpy array, cols = year/month/day at each timestep)
-        history                    (1d numpy array, 1 col, impact scaling factor from 0 to 1 for all dams at each timestep)
-        dams                       (2d numpy array, 1 row per dam, cols = capacity(ML)/surfarea(m2)/catcharea(km2)/demfactor/buildyear/demandid/bypassrate/bypassstart/bypassend)
-        catcharea                  (scalar, size of catchment in km2)
-        istart/iend                (integers, index of first and last useful flow entries in flow array)
-    
-    Note that all inputs are numpy-based so that NUMBA can make it work super fast
+    Calculate farm dam impacts on flow (numba @jit compiled).
+
+    Returns:
+        global_array  (nrows, 9)  - catchment fluxes per timestep
+        alldam_array  (nrows, n_output, 11) - per-output-dam results per timestep
+    where nrows = iend - istart + 1.
     """
     numdams = len(dams)
-    global_results = []
-    alldam_results = []
-    varyarea = store_params['vary_surfarea']
-    vsa_a = store_params['vol_surfarea_a']
-    vsa_b = store_params['vol_surfarea_b']
-    
-    # set up ENDstore array, set ENDstore = capacity
-    estore = np.zeros(numdams)                                              
-    estore[:] = dams[:,0] * store_params['startstore_propfull']                # end storage = capacity x start proportion
-    
-    for istep in range(istart,iend+1):                                         # for each timestep in the useful range
-        
+
+    n_output = 0                                                               # number of dams flagged for individual output
+    for i in range(numdams):
+        if dams[i,13] > 0:
+            n_output += 1
+
+    nrows = iend - istart + 1
+    global_array = np.empty((nrows, 9))
+    alldam_array = np.empty((nrows, n_output, 11))
+
+    # set up ENDstore array, set ENDstore = capacity x start proportion
+    estore = dams[:,0] * startprop
+
+    for k in range(nrows):                                                     # for each timestep in the useful range
+        istep = istart + k
         sstore = estore
-        f = flow[istep].item()
-        r = rain[istep].item()
-        e = evap[istep].item()
-        dem = demd[istep,:]
-        h = history[istep].item()
-        yy = years[istep].item()
-        mmdd = monthday[istep].item()
-        
-        estore, singlestep_results, dam_results = stedi_engine_down_singlestep(f,r,e,dem,yy,mmdd,h,dams,catcharea,istep,sstore,True,varyarea,vsa_a,vsa_b)
-        global_results.extend(singlestep_results)
-        alldam_results.extend(dam_results)
-    
-    return global_results, alldam_results
+        res = stedi_engine_down_singlestep(flow[istep], rain[istep], evap[istep], demd[istep,:],
+                                           years[istep], monthday[istep], history[istep],
+                                           dams, catcharea, istep, sstore, True, varyarea, vsa_a, vsa_b)
+        estore = res[0]
+        global_array[k,0] = res[1]; global_array[k,1] = res[2]; global_array[k,2] = res[3]
+        global_array[k,3] = res[4]; global_array[k,4] = res[5]; global_array[k,5] = res[6]
+        global_array[k,6] = res[7]; global_array[k,7] = res[8]; global_array[k,8] = res[9]
+        if n_output > 0:
+            alldam_array[k,:,:] = res[10]
+
+    return global_array, alldam_array
 
 # %%=======================================================================================================================
 '''
@@ -210,16 +190,16 @@ def calc_from_down_to_up(damlist_df, demands_df, rain_df, evap_df, flowout_df, c
                                       'demfactor','year_start','demand_id',
                                       'bypass_MLperT','bypass_start_ddmm','bypass_end_ddmm',
                                       'wfill_MLperT','wfill_start_ddmm','wfill_end_ddmm',
-                                      'dsdam','output']].to_numpy()
-    
+                                      'dsdam','output']].to_numpy(dtype='float64')
+
     # convert timeseries to numpy arrays
     flow_array = flowout_df.to_numpy().astype('float64').flatten()
     rain_array = rain_df.to_numpy().astype('float64').flatten()
     evap_array = evap_df.to_numpy().astype('float64').flatten()
-    demd_array = demands_df.to_numpy()
-    
+    demd_array = demands_df.to_numpy(dtype='float64')
+
     # create array of year number for each timestep to identify when a dam should activate
-    year_array = flowout_df.index.year.to_numpy()
+    year_array = flowout_df.index.year.to_numpy(dtype='int64')
     mmdd_array = flowout_df.index.strftime('%m%d').astype('int32').to_numpy()
     history_array = histoscale_df.to_numpy().flatten()
     
@@ -230,27 +210,29 @@ def calc_from_down_to_up(damlist_df, demands_df, rain_df, evap_df, flowout_df, c
     iend = flowout_df.index.get_loc(dtend)
     
     # run calculations
-    global_results, alldam_results = tedi_engine_up(flow_array, rain_array, evap_array, demd_array, year_array, mmdd_array, history_array, damlist_array, cat_area, istart, iend, store_params)
-    
-    # reformat global results from a VERY long list to a sensible dataframe
+    global_array, alldam_array = tedi_engine_up(flow_array, rain_array, evap_array, demd_array, year_array, mmdd_array, history_array, damlist_array, cat_area, istart, iend,
+                                                store_params['vary_surfarea'], store_params['vol_surfarea_a'], store_params['vol_surfarea_b'], store_params['startstore_propfull'])
+
+    global_results, alldam_results = _format_engine_results(global_array, alldam_array, flowout_df.index)
+
+    return global_results, alldam_results
+
+# %%=======================================================================================================================
+def _format_engine_results(global_array, alldam_array, index):
+    '''Turn the engine's numpy result arrays into the catch_results and indiv_results
+    DataFrames. global_array is (nsteps, 9); alldam_array is (nsteps, n_output, 11).'''
     global_results_columns = ['sstore', 'flow_up', 'netevap', 'demd_sum', 'wf', 'bp', 'estore', 'flow_down', 'agg_impact']
-    n = len(global_results) // len(global_results_columns)
-    global_results_array = np.array(global_results,dtype=np.float64)
-    new_array = global_results_array.reshape(n, len(global_results_columns))
-    global_results = pd.DataFrame(new_array,columns=global_results_columns,index=flowout_df.index)
-    
-    # reformat individual dam results from a VERY long list to a sensible dataframe
+    global_results = pd.DataFrame(global_array, columns=global_results_columns, index=index)
+
     alldam_results_columns = ['istep','idam','sstore','local_inflow','updam_spill','netevap','demand','wf','bp','es','outflow']
-    n = len(alldam_results) // len(alldam_results_columns)
-    alldam_results_array = np.array(alldam_results,dtype=np.float64)
-    new_array = alldam_results_array.reshape(n, len(alldam_results_columns))
-    alldam_results = pd.DataFrame(new_array, columns=alldam_results_columns)
+    alldam_flat = alldam_array.reshape(-1, len(alldam_results_columns))         # (nsteps * n_output, 11)
+    alldam_results = pd.DataFrame(alldam_flat, columns=alldam_results_columns)
     alldam_results['istep'] = alldam_results['istep'].astype(int)
     alldam_results['idam'] = alldam_results['idam'].astype(int)
-    alldam_results['date'] = alldam_results['istep'].apply(lambda x: flowout_df.index[x])
+    alldam_results['date'] = alldam_results['istep'].apply(lambda x: index[x])
     columns_order = ['istep', 'idam', 'date', 'sstore', 'local_inflow', 'updam_spill', 'netevap', 'demand', 'wf', 'bp', 'es', 'outflow']
     alldam_results = alldam_results[columns_order]
-    
+
     return global_results, alldam_results
 
 # %%=======================================================================================================================
@@ -260,85 +242,80 @@ This is much harder than calculating the other way, because the flow has to be e
 It includes a bisection solver to estimate the upstream flow.
 The original Windows STEDI used a bisection solver, but I'm not sure how it was implemented. This is a new implementation.
 '''
-#@jit (nopython=True)
-def tedi_engine_up(flow,rain,evap,demd,years,monthday,history,dams,catcharea,istart,iend,store_params):
+@jit (nopython=True, cache=True)
+def tedi_engine_up(flow,rain,evap,demd,years,monthday,history,dams,catcharea,istart,iend,varyarea,vsa_a,vsa_b,startprop):
     """
-    Calculate farm dam impacts on flow (the JIT decorator should get it up to warp speed 9)
-    
-    Takes the following inputs:
-        flow / rain / evap / demd  (1d numpy array, one row per timestep, all units ML or mm)
-        ymd                        (2d numpy array, cols = year/month/day at each timestep)
-        history                    (1d numpy array, 1 col, impact scaling factor from 0 to 1 for all dams at each timestep)
-        dams                       (2d numpy array, 1 row per dam, cols = capacity(ML)/surfarea(m2)/catcharea(km2)/demfactor/buildyear/demandid/bypassrate/bypassstart/bypassend)
-        catcharea                  (scalar, size of catchment in km2)
-        istart/iend                (integers, index of first and last useful flow entries in flow array)
-    
-    Note that all inputs are numpy-based so that NUMBA can make it work super fast
+    Calculate flow UPstream of the dams given the catchment flow DOWNstream, using a
+    per-timestep bisection solver (numba @jit compiled).
+
+    Returns global_array (nrows, 9) and alldam_array (nrows, n_output, 11), as for
+    tedi_engine_down.
     """
     numdams = len(dams)
-    varyarea = store_params['vary_surfarea']
-    vsa_a = store_params['vol_surfarea_a']
-    vsa_b = store_params['vol_surfarea_b']
-    
-    # set up ENDstore array, set ENDstore = capacity
-    estore = np.zeros(numdams)                                              
-    estore[:] = dams[:,0] * store_params['startstore_propfull']                # end storage = capacity x start proportion
-    
+
+    n_output = 0
+    for i in range(numdams):
+        if dams[i,13] > 0:
+            n_output += 1
+
+    nrows = iend - istart + 1
+    global_array = np.empty((nrows, 9))
+    alldam_array = np.empty((nrows, n_output, 11))
+
+    # set up ENDstore array, set ENDstore = capacity x start proportion
+    estore = dams[:,0] * startprop
+
     # set up basic parameters for the bisection
     increment = 2.0
-    maxmult = 10
+    maxmult = 10.0
     tolerance = 0.02
-    
-    # set up results
-    global_results = []
-    alldam_results = []
 
-    for istep in range(istart,iend+1):                                         # for each timestep in the useful range
-        #print(f'istep = {istep}')
-        q_obs = flow[istep].item()                                             # define the observed downstream flow
-        r = rain[istep].item()
-        e = evap[istep].item()
+    outflowcol = 8      # index of the downstream flow (outflow_sum) in the singlestep return tuple
+
+    for k in range(nrows):                                                     # for each timestep in the useful range
+        istep = istart + k
+        q_obs = flow[istep]                                                    # define the observed downstream flow
+        r = rain[istep]
+        e = evap[istep]
         d = demd[istep,:]
-        mmdd = monthday[istep].item()    #ymd[istep,1]*100 + ymd[istep,2]
-        yy = years[istep].item()         #ymd[istep,0]
-        h = history[istep].item()
-        
+        mmdd = monthday[istep]
+        yy = years[istep]
+        h = history[istep]
+
         sstore = estore
-        
+
         a = q_obs
         iloop = 0
         maxloops = 10
-        
-        outflowcol = 7      # this is the column number to get the downstream flow from the 'singlestep_results' array
-        
-        x1,x2,x3 = stedi_engine_down_singlestep(a,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,False,varyarea,vsa_a,vsa_b)
-        diff_a = x2[outflowcol] - q_obs
+
+        res = stedi_engine_down_singlestep(a,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,False,varyarea,vsa_a,vsa_b)
+        diff_a = res[outflowcol] - q_obs
         b = a
         diff_b = diff_a
         if diff_a < 0:                                                         # if est - obs is negative, the starting flow was too low so we need to increase it
             while (diff_b < 0) and (iloop<maxloops):
                 iloop += 1
                 b *= increment
-                x1,x2,x3 = stedi_engine_down_singlestep(b,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,False,varyarea,vsa_a,vsa_b)
-                diff_b = x2[outflowcol] - q_obs
+                res = stedi_engine_down_singlestep(b,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,False,varyarea,vsa_a,vsa_b)
+                diff_b = res[outflowcol] - q_obs
             if iloop == maxloops:
                 b = a * maxmult
         else:                                                                  # if est - obs is positive, the starting flow was too high so we need to decrease it
             while (diff_b > 0) and (b > tolerance) and (iloop<maxloops):
                 iloop += 1
                 b /= increment
-                x1,x2,x3 = stedi_engine_down_singlestep(b,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,False,varyarea,vsa_a,vsa_b)
-                diff_b = x2[outflowcol] - q_obs
+                res = stedi_engine_down_singlestep(b,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,False,varyarea,vsa_a,vsa_b)
+                diff_b = res[outflowcol] - q_obs
             if iloop == maxloops:
-                b = 0
-        
+                b = 0.0
+
         iloop = 0
         maxloops = 100
         while (abs(b - a) / 2 > tolerance) and (iloop<maxloops):                  # Now that f(a) and f(b) have opposite signs, we can apply the standard bisection algorithm
-            iloop += 1    
+            iloop += 1
             midpoint = (a + b) / 2
-            x1,x2,x3 = stedi_engine_down_singlestep(midpoint,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,False,varyarea,vsa_a,vsa_b)
-            diff_mid = x2[outflowcol] - q_obs
+            res = stedi_engine_down_singlestep(midpoint,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,False,varyarea,vsa_a,vsa_b)
+            diff_mid = res[outflowcol] - q_obs
             if diff_mid == 0:                                                  # We've found an exact root. Cool!
                 a = midpoint
                 b = midpoint
@@ -346,23 +323,25 @@ def tedi_engine_up(flow,rain,evap,demd,years,monthday,history,dams,catcharea,ist
                 b = midpoint
             else:                                                              # The root is in the right subinterval
                 a = midpoint
-        
+
         flow_us = (a + b) / 2                                                  # The midpoint is the best estimate of the upstream flow
-        
-        #print(f'iloop = {iloop}, a = {a}, b = {b}')
-        
-        estore, singlestep_results, dam_results = stedi_engine_down_singlestep(flow_us,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,True,varyarea,vsa_a,vsa_b)
-        global_results.extend(singlestep_results)
-        alldam_results.extend(dam_results)
-    
-    return global_results, alldam_results # these outputs are very very long lists
+
+        res = stedi_engine_down_singlestep(flow_us,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,True,varyarea,vsa_a,vsa_b)
+        estore = res[0]
+        global_array[k,0] = res[1]; global_array[k,1] = res[2]; global_array[k,2] = res[3]
+        global_array[k,3] = res[4]; global_array[k,4] = res[5]; global_array[k,5] = res[6]
+        global_array[k,6] = res[7]; global_array[k,7] = res[8]; global_array[k,8] = res[9]
+        if n_output > 0:
+            alldam_array[k,:,:] = res[10]
+
+    return global_array, alldam_array
         
 # %%=======================================================================================================================
 '''
 This function will calculate the flow from up to down for a single timestep.
 It needs to be run recursively to find a suitable upstream flow, or can just be run once to find the downstream flow.
 '''
-@jit (nopython=True)
+@jit (nopython=True, cache=True)
 def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcharea,istep,sstore,output_tf,varyarea,a,b):
     
     """
@@ -384,12 +363,16 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
     """
     # set up variables needed for THIS timestep
     numdams = len(dams)
-    dsspills = np.zeros((numdams,1))
-    dam_results = []
-    
+    dsspills = np.zeros(numdams)
+    if output_tf:                                                              # only allocate the (per output dam) results when reporting
+        dam_results = np.empty((numdams, 11))
+    else:
+        dam_results = np.empty((0, 11))
+    nout = 0
+
     # set up variables needed for the NEXT timestep
     estore = sstore * 0.0
-    
+
     # set up AGGREGATE variables for the timestep
     sstore_sum = 0.0
     flow_up_sum = 0.0
@@ -397,75 +380,77 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
     demd_sum = 0.0
     wf_sum = 0.0
     bp_sum = 0.0
-    estore_sum = 0.0                                                          
-    
+    estore_sum = 0.0
+    outflow_sum = 0.0
+    aggimpact_sum = 0.0
+
     for idam in range(0,numdams):                                              # for each dam in the catchment
-        
-        ss = sstore[idam].item()
-        
-        capc = dams[idam,0].item()                                             # assign dam characteristics and parameters
-        
+
+        ss = sstore[idam]
+
+        capc = dams[idam,0]                                                    # assign dam characteristics and parameters
+
         if varyarea:
             surf = (ss/a)**(1/b)                                               # surface area varies with volume stored   v = a.s**b  so s = (v/a) ** (1/b)
         else:                                                                  # OR
-            surf = dams[idam,1].item()                                         # surface area is always the maximum
-        
-        ctch = dams[idam,2].item()
-        dfac = dams[idam,3].item()
-        buildyr = int(dams[idam,4].item())
-        demdid = int(dams[idam,5].item())
-        bprate = dams[idam,6].item()
-        bpstart = int(dams[idam,7].item())
-        bpend = int(dams[idam,8].item())
-        wfrate = dams[idam,9].item()
-        wfstart = int(dams[idam,10].item())
-        wfend = int(dams[idam,11].item())
-        dsdam = int(dams[idam,12].item())
-        
+            surf = dams[idam,1]                                                # surface area is always the maximum
+
+        ctch = dams[idam,2]
+        dfac = dams[idam,3]
+        buildyr = int(dams[idam,4])
+        demdid = int(dams[idam,5])
+        bprate = dams[idam,6]
+        bpstart = int(dams[idam,7])
+        bpend = int(dams[idam,8])
+        wfrate = dams[idam,9]
+        wfstart = int(dams[idam,10])
+        wfend = int(dams[idam,11])
+        dsdam = int(dams[idam,12])
+
         damoutput = False
         if output_tf:
-            if dams[idam,13].item() > 0:
+            if dams[idam,13] > 0:
                 damoutput = True
-        
-        dem = demd[demdid].item()
-        
+
+        dem = demd[demdid]
+
         if bpstart<=bpend:                                                     # eg. bypass starts in March and ends in August
             if (mmdd<bpstart) or (mmdd>bpend):                                    # if today is outside the season
                 bprate = 0.0                                                      # bypass rate is zero
         else:                                                                  # eg. bypass starts in Nov and ends in May
             if (mmdd<bpstart) and (mmdd>bpend):                                   # if today is outside the season
                 bprate = 0.0                                                      # bypass rate is zero
-        
+
         if wfstart<=wfend:                                                     # eg. wfill starts in March and ends in August
             if (mmdd<wfstart) or (mmdd>wfend):                                    # if today is outside the season
                 wfrate = 0.0                                                      # wfill rate is zero
         else:                                                                  # eg. wfill starts in Nov and ends in May
             if (mmdd<wfstart) and (mmdd>wfend):                                   # if today is outside the season
                 wfrate = 0.0                                                      # wfill rate is zero
-       
+
         if yy<buildyr:                                                         # if the build year has not happened yet
             capc = 0.0                                                            # set physical parameters to zero, except catchment area which can remain intact
             surf = 0.0
-            ctch = dams[idam,2].item()
+            ctch = dams[idam,2]
             dfac = 0.0
             ss = 0.0
 
         # calc inflow, rain, evap, demand, outflows, impact
-        localinflow = ctch / catcharea * flow                                  # inflow = damarea / catcharea x flow        
-        updamspill = dsspills[idam].item()
+        localinflow = ctch / catcharea * flow                                  # inflow = damarea / catcharea x flow
+        updamspill = dsspills[idam]
         netinflow = localinflow + updamspill - bprate                          # netinflow (make sure bypass flow is taken before demands)
         netevap = surf * (evap-rain) / 1e6                                     # netevap = surface area x netevap / 1e6
         demand = capc * dfac * dem                                             # demand = capacity x demfactor x pattern
         bal = (ss + netinflow - netevap - demand + wfrate)                     # raw water balance
-        
+
         es = max(0.0, min(bal,capc) )                                          # end storage must be between 0 and capacity
         outflow = max(0.0, bal - es)                                           # outflow = positive, but only if balance exceeds end storage
         if dsdam>=0:                                                           # if the next downstream id is -99, then we are at the end of the catchment
             dsspills[dsdam] = dsspills[dsdam] + outflow + bprate               # outflow directed into another dam
-        
+
         # aggregate variables across dams as required
         sstore_sum += ss
-        flow_up_sum += localinflow                                             
+        flow_up_sum += localinflow
         netevap_sum += netevap
         demd_sum += demand
         bp_sum += bprate
@@ -473,27 +458,31 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
         estore_sum += es
         if idam == numdams-1:
             outflow_sum = outflow
-            aggimpact_sum = flow_up_sum - outflow_sum - bp_sum
-        
+            aggimpact_sum = flow_up_sum - outflow_sum                           # impact = Q-NoDams - Q-WithDams; bypass is already part of outflow_sum, do not subtract again
+
         # prepare results only if the dam is marked for output
         if damoutput:
-            dam_results_onestep = [np.float64(istep),np.float64(idam),ss,localinflow,updamspill,netevap,demand,wfrate,bprate,es,outflow]
-            dam_results.extend(dam_results_onestep)
-            
+            dam_results[nout,0] = istep
+            dam_results[nout,1] = idam
+            dam_results[nout,2] = ss
+            dam_results[nout,3] = localinflow
+            dam_results[nout,4] = updamspill
+            dam_results[nout,5] = netevap
+            dam_results[nout,6] = demand
+            dam_results[nout,7] = wfrate
+            dam_results[nout,8] = bprate
+            dam_results[nout,9] = es
+            dam_results[nout,10] = outflow
+            nout += 1
+
         # prepare variables needed for next timestep
         estore[idam] = es                                                      # end storage
-        
-    singlestep_results = [sstore_sum,
-                          flow_up_sum,
-                          netevap_sum,
-                          demd_sum,
-                          wf_sum,
-                          bp_sum,
-                          estore_sum,
-                          outflow_sum,
-                          aggimpact_sum]
-    
-    return estore, singlestep_results, dam_results 
+
+    # returns: estore array, then the 9 global fluxes in catch_results column order
+    # (sstore, flow_up, netevap, demd_sum, wf, bp, estore, flow_down, agg_impact),
+    # then the (n_output, 11) individual-dam results for this timestep
+    return (estore, sstore_sum, flow_up_sum, netevap_sum, demd_sum, wf_sum, bp_sum,
+            estore_sum, outflow_sum, aggimpact_sum, dam_results[:nout,:])
 
 # %%=======================================================================================================================
 
