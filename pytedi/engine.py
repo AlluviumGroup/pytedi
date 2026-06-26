@@ -473,8 +473,8 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
         estore_sum += es
         if idam == numdams-1:
             outflow_sum = outflow
-            aggimpact_sum = flow_up_sum - outflow_sum - bp_sum
-        
+            aggimpact_sum = flow_up_sum - outflow_sum                           # impact = Q-NoDams - Q-WithDams; bypass is already part of outflow_sum, do not subtract again
+
         # prepare results only if the dam is marked for output
         if damoutput:
             dam_results_onestep = [np.float64(istep),np.float64(idam),ss,localinflow,updamspill,netevap,demand,wfrate,bprate,es,outflow]
