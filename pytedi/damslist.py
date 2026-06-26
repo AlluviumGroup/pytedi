@@ -159,7 +159,7 @@ def damlist_from_distribution(params):
     #damlist.set_index('dam_id',inplace=True)
     
     # set up a random number generator
-    rng = np.random.default_rng(seed=42)
+    rng = np.random.default_rng(seed=params.get('seed', 42))
     
     # generate dams until the total volume exceeds the assigned total
     sumvol = 0.0
@@ -219,7 +219,7 @@ def catch_areas_random(volumes,params):
     total_area = params['cat_area_km2']
     
     # set up a random number generator
-    rng = np.random.default_rng(seed=42)
+    rng = np.random.default_rng(seed=params.get('seed', 42))
     
     # set up result list
     catch_areas = volumes * 0.0
