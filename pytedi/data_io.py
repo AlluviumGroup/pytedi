@@ -147,38 +147,38 @@ historical_scaling_factors =      [{joinfactors}]
         f.write(toml_str)
     
     head_str = f"""# pytedi - Python tool for estimating dam impacts
-    # ===============================================
-    #
-    # Version {toolvers} - {tooldate}
-    # Authors - {toolauth}
-    #
-    # -------------------------
-    # MODEL FILE - LIST OF DAMS
-    # -------------------------
-    # Model title =                          {model.title}
-    # File containing parameters =           {param_file}
-    # File containing climate and demands =  {ts_file}
-    # -------------------------
-    #
-    # dam_id            = unique id for each dam (catchment outlet not included in the list))
-    # ds_damid          = unique id for the next downstream dam
-    # surfacearea_m2    = dam surface area (m2)
-    # catchuptotal_km2  = dam total upstream area including area impounded by upstream dams (km2)
-    # catchuplocal_km2  = dam local upstream area excluding area impounded by upstream dams (km2)
-    # vol_ML            = dam maxium capacity (ML)
-    # year_start        = year the dam was commissioned (can be set to 0 if historical scaling is not needed)
-    # group_name        = the name of the demand group, such as 'irrigation' or 'stock and domestic'
-    # demfactor         = the average annual demand expressed as a proportion of the dam capacity
-    # bypass_MLperT     = the flow rate of the bypass (ML per timestep)
-    # bypass_start_ddmm = the start of the bypass season as integer mmdd eg. 1st March would be 0301, or 15th June would be 0615
-    # bypass_end_ddmm   = the end of the bypass season as integer mmdd eg. 1st March would be 0301, or 15th June would be 0615
-    # wfill_MLperT      = the flow rate of winterfill pumping (ML per timestep)
-    # wfill_start_ddmm  = the start of the winterfill season as integer mmdd eg. 1st March would be 0301, or 15th June would be 0615
-    # wfill_end_ddmm    = the end of the winterfill season as integer mmdd eg. 1st March would be 0301, or 15th June would be 0615
-    # output            = set to 1 to flag that results for this individual dam should be reported in the individual results file (any other value will give no results output)
-    # demand_id         = integer linked to the group_name
-    #
-    """
+# ===============================================
+#
+# Version {toolvers} - {tooldate}
+# Authors - {toolauth}
+#
+# -------------------------
+# MODEL FILE - LIST OF DAMS
+# -------------------------
+# Model title =                          {model.title}
+# File containing parameters =           {param_file}
+# File containing climate and demands =  {ts_file}
+# -------------------------
+#
+# dam_id            = unique id for each dam (catchment outlet not included in the list))
+# ds_damid          = unique id for the next downstream dam
+# surfacearea_m2    = dam surface area (m2)
+# catchuptotal_km2  = dam total upstream area including area impounded by upstream dams (km2)
+# catchuplocal_km2  = dam local upstream area excluding area impounded by upstream dams (km2)
+# vol_ML            = dam maxium capacity (ML)
+# year_start        = year the dam was commissioned (can be set to 0 if historical scaling is not needed)
+# group_name        = the name of the demand group, such as 'irrigation' or 'stock and domestic'
+# demfactor         = the average annual demand expressed as a proportion of the dam capacity
+# bypass_MLperT     = the flow rate of the bypass (ML per timestep)
+# bypass_start_ddmm = the start of the bypass season as integer mmdd eg. 1st March would be 0301, or 15th June would be 0615
+# bypass_end_ddmm   = the end of the bypass season as integer mmdd eg. 1st March would be 0301, or 15th June would be 0615
+# wfill_MLperT      = the flow rate of winterfill pumping (ML per timestep)
+# wfill_start_ddmm  = the start of the winterfill season as integer mmdd eg. 1st March would be 0301, or 15th June would be 0615
+# wfill_end_ddmm    = the end of the winterfill season as integer mmdd eg. 1st March would be 0301, or 15th June would be 0615
+# output            = set to 1 to flag that results for this individual dam should be reported in the individual results file (any other value will give no results output)
+# demand_id         = integer linked to the group_name
+#
+"""
     
     # Write the file
     with open(dam_file, "w") as f:
@@ -186,135 +186,33 @@ historical_scaling_factors =      [{joinfactors}]
         model.damlist.to_csv(f, lineterminator='\n')
         
     head_str = f"""# pytedi - Python tool for estimating dam impacts
-    # ===============================================
-    #
-    # Version {toolvers} - {tooldate}
-    # Authors - {toolauth}
-    #
-    # ----------------------------------------------
-    # MODEL FILE - TIMESERIES OF CLIMATE AND DEMANDS
-    # ----------------------------------------------
-    # Model title =                   {model.title}
-    # File containing parameters =    {param_file}
-    # File containing list of dams =  {dam_file}
-    # ----------------------------------------------
-    #
-    # rain               = rainfall (mm)
-    # evap               = evaporation from the surface of a dam (mm)
-    # flowup             = flow upstream of farm dams (also known as 'natural' or 'unimpacted' or 'no dams' flow) (ML)
-    # flowdown           = flow downstream of farm dams (also known as 'impacted' or 'with dams' flow) (ML)
-    # remaining columns  = demand timeseries for different types of dams (unitless - multiplied by demand factor to represent a proportion of the dam volume extracted each day)
-    #
-    """
+# ===============================================
+#
+# Version {toolvers} - {tooldate}
+# Authors - {toolauth}
+#
+# ----------------------------------------------
+# MODEL FILE - TIMESERIES OF CLIMATE AND DEMANDS
+# ----------------------------------------------
+# Model title =                   {model.title}
+# File containing parameters =    {param_file}
+# File containing list of dams =  {dam_file}
+# ----------------------------------------------
+#
+# rain               = rainfall (mm)
+# evap               = evaporation from the surface of a dam (mm)
+# flowup             = flow upstream of farm dams (also known as 'natural' or 'unimpacted' or 'no dams' flow) (ML)
+# flowdown           = flow downstream of farm dams (also known as 'impacted' or 'with dams' flow) (ML)
+# remaining columns  = demand timeseries for different types of dams (unitless - multiplied by demand factor to represent a proportion of the dam volume extracted each day)
+#
+"""
     
     # Write the file
     with open(ts_file, "w") as f:
         f.write(_strip_line_indents(head_str))                                 # '#' must be at column 0 so pandas comment='#' skips it
         model.ts.to_csv(f, lineterminator='\n')
     
-    # Read it back
-    # with outfile.open("rb") as f:
-    #     toml_data_read = tomllib.load(f)
-    
-    
-    # Access scalar values
-    # model_title = toml_data_read["model_title"]
-    # model_timestep = toml_data_read["model_timestep"]
-    # scale_limit = toml_data_read["scale_limit"]
-    
-    
-    # # Convert historical_scaling back to a DataFrame
-    # df_historical_scaling = pd.DataFrame(config_read["historical_scaling"])
-    # df_historical_scaling["date"] = pd.to_datetime(df_historical_scaling["date"])
-    
-# %%=======================================================================================================================
-def OLD_save_pytedi_model(model,outfile):
-   
-    param_file = add_suffix_to_filename(outfile,'params','scn')
-    dam_file = add_suffix_to_filename(outfile,'dams','csv')
-    ts_file = add_suffix_to_filename(outfile,'timeseries','csv')
-    toolvers = config.pytedi_version
-    tooldate = config.pytedi_date
-    toolauth = config.pytedi_authors
-        
-    class CsvString(str):
-        pass 
-    def csv_string_representer(dumper, data):
-        return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
-    
-    # Define a custom representer to force plain style (no quotes)
-    def plain_string_representer(dumper, data):
-        return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='')
 
-    # Register the representer for all Python string types
-    yaml.SafeDumper.add_representer(str, plain_string_representer)
-    
-    histoscale_csv = io.StringIO()
-    model.histoscale.to_csv(histoscale_csv,index=True)
-    yaml.add_representer(CsvString, csv_string_representer)
-
-
-    histoscale_string = model.histoscale.to_csv(lineterminator='\n')
-    
-    # save model parameter file
-    model_data = {
-        'Model title': model.title,
-        'Model timestep': model.timestep,
-        'Calculating natural or observed?': model.calc_nat_or_obs,
-        'Total catchment area (km2)': model.cat_area_km2,
-        'Scale limit': model.scale_limit,
-        'Date of last model run': model.rundate,
-        'File containing list of dams': dam_file,
-        'File containing climate and demands': ts_file,
-        'Historical scaling factors (linear adjustment of impacts after processing) (date, factor)': histoscale_string
-    }
-    
-    def literal_string_representer(dumper, data):
-        if '\n' in data:
-            return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
-        return dumper.represent_scalar('tag:yaml.org,2002:str', data)
-        # return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
-
-    yaml.SafeDumper.add_representer(str, literal_string_representer)
-
-    with open(param_file, 'w') as f:
-        f.write("# pytedi - Python tool for estimating dam impacts\n")
-        f.write('# ===============================================\n')
-        f.write(f"# Version {toolvers} - {tooldate}\n")
-        f.write(f'# Authors - {toolauth}\n')
-        f.write('# -----------------------\n')
-        f.write('# MODEL FILE - PARAMETERS\n')
-        f.write('# -----------------------\n')
-        yaml.dump(model_data, f, sort_keys=False, default_flow_style=False, Dumper=yaml.SafeDumper)
-    
-    # save damlist
-    with open(dam_file, 'w') as f:
-        f.write("# pytedi - Python tool for estimating dam impacts\n")
-        f.write('# ===============================================\n')
-        f.write(f"# Version {toolvers} - {tooldate}\n")
-        f.write(f'# Authors - {toolauth}\n')
-        f.write(f'# File containing parameters - {param_file}\n')
-        f.write(f'# File containing climate and demands - {ts_file}\n')
-        f.write('# -------------------------\n')
-        f.write('# MODEL FILE - LIST OF DAMS\n')
-        f.write('# -------------------------\n')
-        model.damlist.to_csv(f, lineterminator='\n')
-        
-    # save timeseries
-    with open(ts_file, 'w') as f:
-        f.write("# pytedi - Python tool for estimating dam impacts\n")
-        f.write('# ===============================================\n')
-        f.write(f"# Version {toolvers} - {tooldate}\n")
-        f.write(f'# Authors - {toolauth}\n')
-        f.write(f'# File containing parameters - {param_file}\n')
-        f.write(f'# File containing list of dams - {dam_file}\n')
-        f.write('# ----------------------------------------------\n')
-        f.write('# MODEL FILE - TIMESERIES OF CLIMATE AND DEMANDS\n')
-        f.write('# ----------------------------------------------\n')
-        model.ts.to_csv(f, lineterminator='\n')
-
-    # save histoscale
-     
 # %%=======================================================================================================================
 def add_suffix_to_filename(filename, suffix, extension):
     base, ext = os.path.splitext(filename)

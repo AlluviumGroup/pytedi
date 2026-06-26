@@ -43,3 +43,9 @@ f4model.run_model()
 f4model.save_results_global(r'F4_pytedi_out_global.csv')
 f4model.save_results_individual(r'F4_pytedi_out_indiv.csv')
 f4model.save_model('F4_pytedi_model')
+
+fname = 'Test1_5dams.scn'
+t1model,t1params = pytedi.open_windows_STEDI_scenario(fname)
+t1model.run_model()
+t1model.save_model("test1_5dams_pytedi")
+t1model.save_results_global('test1_5dams_pytedi_globalout.csv')

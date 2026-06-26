@@ -545,8 +545,8 @@ def damlist_preprocessing(damlist_df, demands_df, cat_area, scale_limit):
     damlist_df.loc[filt,'dsdam'] = new_row_idx
 
     # add a row at the end to represent the catchment outlet
-    # need to add [dam_id,ds_damid,surfarea, catchup, catchloc,vol,year,groupname,demfact,bpassQ,bpass_start,bpass_end,wfillQ,wfill_start,wfill_end,output,demandid,dsdam_idx]
-    new_row =     [new_row_idx,-99,-99,      cat_area,unimp_km2,0, 0,   'none',   0,      0,     101,        1231,     0,     101,        1231,     0,     0,       -99]
+    # need to add [dam_id,      ds_damid, surfarea, catchup,  catchloc,  vol, year, groupname, demfact, bpassQ, bpass_start, bpass_end, wfillQ, wfill_start, wfill_end, output, demandid, dsdam_idx]
+    new_row =     [new_row_idx, -99,      0,        cat_area, unimp_km2, 0,   0,    'none',    0,       0,      101,         1231,      0,      101,         1231,      0,      0,        -99]
     damlist_df.loc[new_row_idx] = new_row
     
 
