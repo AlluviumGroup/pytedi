@@ -188,6 +188,7 @@ def damlist_from_distribution(params):
     damlist['surfacearea_m2'] = (damlist['vol_ML']/aa)**(1/bb)
     
     # generate catchment areas - this requires a separate routine. Need to specify in the params whether this is randomly assigned (Morden 2018), or linearly assigned (Nathan 2004).
+    # this is always 'linear'. The random method has not been implemented in STEDI. But its nice to have the subroutine if its ever needed.
     if catcharea_method == 'random':
         catch_areas = catch_areas_random(damlist['vol_ML'],params)
         

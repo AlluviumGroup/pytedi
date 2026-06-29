@@ -157,8 +157,8 @@ def tedi_engine_down(flow,rain,evap,demd,years,monthday,history,dams,catcharea,i
             n_output += 1
 
     nrows = iend - istart + 1
-    global_array = np.empty((nrows, 9))
-    alldam_array = np.empty((nrows, n_output, 11))
+    global_array = np.empty((nrows, 14))
+    alldam_array = np.empty((nrows, n_output, 16))
 
     # set up ENDstore array, set ENDstore = capacity x start proportion
     estore = dams[:,0] * startprop
@@ -169,12 +169,26 @@ def tedi_engine_down(flow,rain,evap,demd,years,monthday,history,dams,catcharea,i
         res = stedi_engine_down_singlestep(flow[istep], rain[istep], evap[istep], demd[istep,:],
                                            years[istep], monthday[istep], history[istep],
                                            dams, catcharea, istep, sstore, True, varyarea, vsa_a, vsa_b)
-        estore = res[0]
-        global_array[k,0] = res[1]; global_array[k,1] = res[2]; global_array[k,2] = res[3]
-        global_array[k,3] = res[4]; global_array[k,4] = res[5]; global_array[k,5] = res[6]
-        global_array[k,6] = res[7]; global_array[k,7] = res[8]; global_array[k,8] = res[9]
+
+        estore = res[0]                     # estore
+        
+        global_array[k,0] = res[1]          # sstore_sum
+        global_array[k,1] = res[2]          # flow_up_sum
+        global_array[k,2] = res[3]          # netevap_sum
+        global_array[k,3] = res[4]          # netevapact_sum
+        global_array[k,4] = res[5]          # demd_sum
+        global_array[k,5] = res[6]          # demdact_sum
+        global_array[k,6] = res[7]          # wf_sum
+        global_array[k,7] = res[8]          # wfact_sum
+        global_array[k,8] = res[9]          # bp_sum
+        global_array[k,9] = res[10]         # bpact_sum
+        global_array[k,10] = res[11]        # estore_sum
+        global_array[k,11] = res[12]        # spills_sum
+        global_array[k,12] = res[13]        # outflow_sum
+        global_array[k,13] = res[14]        # aggimpact_sum
+        
         if n_output > 0:
-            alldam_array[k,:,:] = res[10]
+            alldam_array[k,:,:] = res[15]   # dam_results
 
     return global_array, alldam_array
 
@@ -221,20 +235,21 @@ def calc_from_down_to_up(damlist_df, demands_df, rain_df, evap_df, flowout_df, c
 def _format_engine_results(global_array, alldam_array, index):
     '''Turn the engine's numpy result arrays into the catch_results and indiv_results
     DataFrames. global_array is (nsteps, 9); alldam_array is (nsteps, n_output, 11).'''
-    global_results_columns = ['sstore', 'flow_up', 'netevap', 'demd_sum', 'wf', 'bp', 'estore', 'flow_down', 'agg_impact']
+    global_results_columns = ['sstore', 'flow_up', 'netevap', 'netevap_actual', 'demand', 'demand_actual', 'wf', 'wf_actual', 'bp', 'bp_actual', 'estore', 'spills', 'flow_down', 'agg_impact']
     global_results = pd.DataFrame(global_array, columns=global_results_columns, index=index)
 
-    alldam_results_columns = ['istep','idam','sstore','local_inflow','updam_spill','netevap','demand','wf','bp','es','outflow']
+    alldam_results_columns = ['istep','idam','sstore','local_inflow','updam_spill','netevap','netevap_actual','demand','demand_actual','wf','wf_actual','bp','bp_actual','es','spills','outflow']
     alldam_flat = alldam_array.reshape(-1, len(alldam_results_columns))         # (nsteps * n_output, 11)
     alldam_results = pd.DataFrame(alldam_flat, columns=alldam_results_columns)
     alldam_results['istep'] = alldam_results['istep'].astype(int)
     alldam_results['idam'] = alldam_results['idam'].astype(int)
     alldam_results['date'] = alldam_results['istep'].apply(lambda x: index[x])
-    columns_order = ['istep', 'idam', 'date', 'sstore', 'local_inflow', 'updam_spill', 'netevap', 'demand', 'wf', 'bp', 'es', 'outflow']
+    columns_order = ['istep','idam','date','sstore','local_inflow','updam_spill','netevap','netevap_actual','demand','demand_actual','wf','wf_actual','bp','bp_actual','es','spills','outflow']
     alldam_results = alldam_results[columns_order]
 
     return global_results, alldam_results
-
+    # (ss, upflows, netevap, netevap_act, demand, demand_act, wf_rate, wfrate_act, bprate, bprate_act, es, spills, outflow, agg_impact),
+    # (istep, idam, ss, localflow, updamspills, netevap, netevap_act, demand, demand_act, wf_rate, wfrate_act, bprate, bprate_act, es, spills, outflow)
 # %%=======================================================================================================================
 '''
 This function will calculate the flow UPstream of the dams given the total catchment flow DOWNstream.
@@ -259,8 +274,8 @@ def tedi_engine_up(flow,rain,evap,demd,years,monthday,history,dams,catcharea,ist
             n_output += 1
 
     nrows = iend - istart + 1
-    global_array = np.empty((nrows, 9))
-    alldam_array = np.empty((nrows, n_output, 11))
+    global_array = np.empty((nrows, 14))
+    alldam_array = np.empty((nrows, n_output, 16))
 
     # set up ENDstore array, set ENDstore = capacity x start proportion
     estore = dams[:,0] * startprop
@@ -270,7 +285,7 @@ def tedi_engine_up(flow,rain,evap,demd,years,monthday,history,dams,catcharea,ist
     maxmult = 10.0
     tolerance = 0.02
 
-    outflowcol = 8      # index of the downstream flow (outflow_sum) in the singlestep return tuple
+    outflowcol = 13      # index of the downstream flow (outflow_sum) in the singlestep return tuple
 
     for k in range(nrows):                                                     # for each timestep in the useful range
         istep = istart + k
@@ -327,14 +342,29 @@ def tedi_engine_up(flow,rain,evap,demd,years,monthday,history,dams,catcharea,ist
         flow_us = (a + b) / 2                                                  # The midpoint is the best estimate of the upstream flow
 
         res = stedi_engine_down_singlestep(flow_us,r,e,d,yy,mmdd,h,dams,catcharea,istep,sstore,True,varyarea,vsa_a,vsa_b)
-        estore = res[0]
-        global_array[k,0] = res[1]; global_array[k,1] = res[2]; global_array[k,2] = res[3]
-        global_array[k,3] = res[4]; global_array[k,4] = res[5]; global_array[k,5] = res[6]
-        global_array[k,6] = res[7]; global_array[k,7] = res[8]; global_array[k,8] = res[9]
+        
+        estore = res[0]                     # estore
+        
+        global_array[k,0] = res[1]          # sstore_sum
+        global_array[k,1] = res[2]          # flow_up_sum
+        global_array[k,2] = res[3]          # netevap_sum
+        global_array[k,3] = res[4]          # netevapact_sum
+        global_array[k,4] = res[5]          # demd_sum
+        global_array[k,5] = res[6]          # demdact_sum
+        global_array[k,6] = res[7]          # wf_sum
+        global_array[k,7] = res[8]          # wfact_sum
+        global_array[k,8] = res[9]          # bp_sum
+        global_array[k,9] = res[10]         # bpact_sum
+        global_array[k,10] = res[11]        # estore_sum
+        global_array[k,11] = res[12]        # spills_sum
+        global_array[k,12] = res[13]        # outflow_sum
+        global_array[k,13] = res[14]        # aggimpact_sum
+        
         if n_output > 0:
-            alldam_array[k,:,:] = res[10]
+            alldam_array[k,:,:] = res[15]   # dam_results
 
     return global_array, alldam_array
+    # (ss, localinflow, netevap, netevap_act, demand, demand_act, wf_rate, wfrate_act, bprate, bprate_act, es, spills, outflow, agg_impact),
         
 # %%=======================================================================================================================
 '''
@@ -363,7 +393,7 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
     """
     # set up variables needed for THIS timestep
     numdams = len(dams)
-    dsspills = np.zeros(numdams)
+    dsflows = np.zeros(numdams)
     if output_tf:                                                              # only allocate the (per output dam) results when reporting
         dam_results = np.empty((numdams, 11))
     else:
@@ -383,6 +413,10 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
     estore_sum = 0.0
     outflow_sum = 0.0
     aggimpact_sum = 0.0
+    netevapact_sum = 0.0
+    demdact_sum = 0.0
+    bpact_sum = 0.0
+    wfact_sum = 0.0
 
     for idam in range(0,numdams):                                              # for each dam in the catchment
 
@@ -437,17 +471,42 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
 
         # calc inflow, rain, evap, demand, outflows, impact
         localinflow = ctch / catcharea * flow                                  # inflow = damarea / catcharea x flow
-        updamspill = dsspills[idam]
-        netinflow = localinflow + updamspill - bprate                          # netinflow (make sure bypass flow is taken before demands)
+        updamspill = dsflows[idam]                                             # outflows form upstream dams
+        bprate_act = max(0.0, min(bprate, localinflow + updamspill))           # ACTUAL bypass rate
+        netinflow = localinflow + updamspill - bprate_act                      # netinflow (make sure bypass flow is taken before it reaches the dam)
         netevap = surf * (evap-rain) / 1e6                                     # netevap = surface area x netevap / 1e6
         demand = capc * dfac * dem                                             # demand = capacity x demfactor x pattern
+        
         bal = (ss + netinflow - netevap - demand + wfrate)                     # raw water balance
-
-        es = max(0.0, min(bal,capc) )                                          # end storage must be between 0 and capacity
-        outflow = max(0.0, bal - es)                                           # outflow = positive, but only if balance exceeds end storage
-        if dsdam>=0:                                                           # if the next downstream id is -99, then we are at the end of the catchment
-            dsspills[dsdam] = dsspills[dsdam] + outflow + bprate               # outflow directed into another dam
-
+        
+        wfrate_act = wfrate
+        netevap_act = netevap
+        demand_act = demand
+        
+        es = bal
+        spills = 0.0
+        
+        if bal > capc:                                                         #### too much water... reduce winterfill and allow to spill, demand and netevap stay the same
+            
+            bal2 = (ss + netinflow - netevap_act + demand_act)
+            wfrate_act = max(0.0, min(wfrate, capc - bal2))                    # wfill = lesser of peak rate or (dam capacity - (start storage + inflows - netevap - demand))
+            
+            es = capc
+            spills = bal - capc
+            
+        elif bal < 0.0:                                                        #### not enough water... reduce demand and netevap, but wfill stays unchanged
+            
+            bal2 = (ss + netinflow + wfrate_act)
+            factor = bal2 / (bal2 - bal) # factor = proportion of the timestep that the dam had water
+            netevap_act = netevap * factor
+            demand_act = demand * factor
+            
+            es = 0.0
+        
+        outflow = spills + bprate_act
+        if dsdam>=0:                                                           # if the next downstream id is -99, then no need to aggregate
+            dsflows[dsdam] = dsflows[dsdam] + outflow                          # spills directed into another dam
+            
         # aggregate variables across dams as required
         sstore_sum += ss
         flow_up_sum += localinflow
@@ -456,11 +515,19 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
         bp_sum += bprate
         wf_sum += wfrate
         estore_sum += es
+        
+        # aggregate ACTUAL values where the storage status can affect them
+        netevapact_sum += netevap_act
+        demdact_sum += demand_act
+        bpact_sum += bprate_act
+        wfact_sum += wfrate_act
+        
         if idam == numdams-1:
+            spills_sum = spills
             outflow_sum = outflow
             aggimpact_sum = flow_up_sum - outflow_sum                           # impact = Q-NoDams - Q-WithDams; bypass is already part of outflow_sum, do not subtract again
-
-        # prepare results only if the dam is marked for output
+    
+        # prepare results for a single dam only if the dam is marked for output
         if damoutput:
             dam_results[nout,0] = istep
             dam_results[nout,1] = idam
@@ -468,21 +535,25 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
             dam_results[nout,3] = localinflow
             dam_results[nout,4] = updamspill
             dam_results[nout,5] = netevap
-            dam_results[nout,6] = demand
-            dam_results[nout,7] = wfrate
-            dam_results[nout,8] = bprate
-            dam_results[nout,9] = es
-            dam_results[nout,10] = outflow
+            dam_results[nout,6] = netevap_act
+            dam_results[nout,7] = demand
+            dam_results[nout,8] = demand_act
+            dam_results[nout,9] = wfrate
+            dam_results[nout,10] = wfrate_act
+            dam_results[nout,11] = bprate
+            dam_results[nout,12] = bprate_act
+            dam_results[nout,13] = es
+            dam_results[nout,14] = spills
+            dam_results[nout,15] = outflow
             nout += 1
 
         # prepare variables needed for next timestep
         estore[idam] = es                                                      # end storage
 
-    # returns: estore array, then the 9 global fluxes in catch_results column order
-    # (sstore, flow_up, netevap, demd_sum, wf, bp, estore, flow_down, agg_impact),
+    # returns: estore array, then the 14 global fluxes in catch_results column order
+    # (ss, flow_up, netevap, netevap_act, demand, demand_act, wf_rate, wfrate_act, bprate, bprate_act, es, spills, outflow, agg_impact),
     # then the (n_output, 11) individual-dam results for this timestep
-    return (estore, sstore_sum, flow_up_sum, netevap_sum, demd_sum, wf_sum, bp_sum,
-            estore_sum, outflow_sum, aggimpact_sum, dam_results[:nout,:])
+    return (estore, sstore_sum, flow_up_sum, netevap_sum, netevapact_sum, demd_sum, demdact_sum, wf_sum, wfact_sum, bp_sum, bpact_sum, estore_sum, spills_sum, outflow_sum, aggimpact_sum, dam_results[:nout,:])
 
 # %%=======================================================================================================================
 

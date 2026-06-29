@@ -137,11 +137,13 @@ class tedimodel():
         cols = ['rain', 'evap', 'flowup', 'flowdown']
         self.ts = pd.DataFrame(columns=cols,dtype='float32')
 
-        cols = ['sstore', 'flow_up', 'netevap', 'demd_sum', 'wf', 'bp', 'estore', 'flow_down', 'agg_impact']
+        #cols = ['sstore', 'flow_up', 'netevap', 'demd_sum', 'wf', 'bp', 'estore', 'flow_down', 'agg_impact']
+        cols = ['sstore', 'flow_up', 'netevap', 'netevap_actual', 'demand', 'demand_actual', 'wf', 'wf_actual', 'bp', 'bp_actual', 'estore', 'spills', 'flow_down', 'agg_impact']
         self.catch_results = pd.DataFrame(columns=cols,dtype='float32')
 
-        cols =  ['istep', 'idam', 'sstore', 'local_inflow','updam_spill','netevap','demand', 'wf',     'bp',     'es',     'outflow']
-        types = ['int32', 'int32','float32','float32',     'float32',    'float32','float32','float32','float32','float32','float32']   # first two columns are integers
+        #cols =  ['istep', 'idam', 'sstore', 'local_inflow','updam_spill','netevap','demand', 'wf',     'bp',     'es',     'outflow']
+        cols =  ['istep', 'idam', 'date',          'sstore', 'local_inflow','updam_spill','netevap','netevap_actual','demand', 'demand_actual','wf',     'wf_actual','bp',     'bp_actual','es',     'spills', 'outflow']
+        types = ['int32', 'int32','datetime64[ns]','float32','float32',     'float32',    'float32','float32',       'float32','float32',      'float32','float32',  'float32','float32',  'float32','float32','float32']   # first two columns are integers
         self.indiv_results = pd.DataFrame(columns=cols).astype(dict(zip(cols,types)))
         
         self.pyparams = {}
@@ -151,8 +153,13 @@ class tedimodel():
         global_results, alldam_results = calc_dams(self)
         self.catch_results = global_results
         self.indiv_results = alldam_results
+        
+        if self.calc_nat_or_obs == 'nat':
+            self.ts['flowup'] = self.catch_results['flow_up']                  # paste key flow results into ts dataframe
+        else:
+            self.ts['flowdown'] = self.catch_results['flow_down']              # paste key flow results into ts dataframe
 
-        now = datetime.now()
+        now = datetime.now()                                                   # update latest run time
         self.rundate = now.strftime('%Y-%m-%d %H:%M:%S')
 
         logger.info('Model run completed on %s', self.rundate)
@@ -345,30 +352,18 @@ def open_windows_STEDI_scenario(fname, network_from_out=None, seed=42):
     
     logger.info('Model created: %s', model.title)
     
-    return model, stedi_params          # can comment out the stedi_params when testing is complete
+    return model #, stedi_params          # can comment out the stedi_params when testing is complete
 
 # %%=======================================================================================================================
-def open_pytedi_scenario(prefix):
+def open_pytedi_scenario(infile):
     
-    # open json or yaml file
-    
-    # open timeseries file
-    
-    # open dam list file
-    
-    # assign data in file to a tedimodel object
+    # set up a new tedimodel object
     model = tedimodel()
+    
+    # open the input file and read (along with associated timeseries and parameters)
+    model.open_model(infile)
     
     # return the model
     return model
 
-# %%=======================================================================================================================
-def save_pytedi_scenario(prefix):
-    
-    # write json or yaml file
-    
-    # write timeseries file
-    
-    # write dam list file
-    
-    return
+

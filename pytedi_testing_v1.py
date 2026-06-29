@@ -24,7 +24,9 @@ cbup.save_model('cbup_model')
 
 fname = r'C:\Users\robert.morden\OneDrive - Alluvium Consulting Australia\_Roberts stuff\Tools\Python\pytedi\pytedi_github\10days.scn'
 model_10days,params = pytedi.open_windows_STEDI_scenario(fname)
+
 model_10days.damlist.loc[1,'output'] = 1
+
 # x = model_10days.damlist.loc[:,'catchuplocal_km2']
 # model_10days.damlist.loc[:,'catchuplocal_km2'] = np.trunc(x*100)/100
 model_10days.run_model()
@@ -49,3 +51,9 @@ t1model,t1params = pytedi.open_windows_STEDI_scenario(fname)
 t1model.run_model()
 t1model.save_model("test1_5dams_pytedi")
 t1model.save_results_global('test1_5dams_pytedi_globalout.csv')
+
+fname = 'Test2_5dams_pytedi_params.scn'
+t2model = pytedi.open_pytedi_scenario(fname)
+t2model.run_model()
+t2model.save_model("test2_5dams_pytedi")
+t2model.save_results_global('test2_5dams_pytedi_globalout.csv')
