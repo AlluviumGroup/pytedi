@@ -254,7 +254,7 @@ def _inject_network_into_params(params, net):
     params.setdefault('wfill_end_mmdd', 1231)
 
 # %%=======================================================================================================================
-def open_windows_STEDI_scenario(fname, network_from_out=None):
+def open_windows_STEDI_scenario(fname, network_from_out=None, seed=42):
     '''
     Open a windows STEDI scenario (.scn) file and build a tedimodel.
 
@@ -265,8 +265,14 @@ def open_windows_STEDI_scenario(fname, network_from_out=None):
 
         network_from_out=True       -> auto-locate the .out beside the .scn
         network_from_out="path.out" -> use the given .out file
+
+    seed sets the random seed for distribution-based dam generation (volumes,
+    catchment areas, demand groups). The default (42) makes sampling reproducible;
+    change it to draw a different random dam population. Ignored when an explicit
+    network is imported.
     '''
     stedi_params = read_scenario_file(fname)                                   # open the STEDI file and read the information     DONE
+    stedi_params['seed'] = seed
     logger.info('Read windows STEDI scenario file: %s', fname)
 
     if network_from_out is not None:                                           # use the explicit STEDI network instead of the distribution

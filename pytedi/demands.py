@@ -109,7 +109,7 @@ The function returns a pandas series of the demand groups and demand factors rea
 def demgroups_byprob(params,dams):
 
     # set up a random number generator
-    rng = np.random.default_rng(seed=42)
+    rng = np.random.default_rng(seed=params.get('seed', 42))
 
     # get key parameters
     nbins = params['damdist_nrows']

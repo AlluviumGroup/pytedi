@@ -159,7 +159,7 @@ def damlist_from_distribution(params):
     #damlist.set_index('dam_id',inplace=True)
     
     # set up a random number generator
-    rng = np.random.default_rng(seed=42)
+    rng = np.random.default_rng(seed=params.get('seed', 42))
     
     # generate dams until the total volume exceeds the assigned total
     sumvol = 0.0
@@ -170,12 +170,15 @@ def damlist_from_distribution(params):
         sampled_value = rng.uniform(vol_low[chosen_bin], vol_high[chosen_bin]) # Sample a value uniformly from the chosen bin
         sampled_values.append(sampled_value)                                   # Add the sampled value to the list and update the current sum
         sumvol += sampled_value
-        
-        if sumvol > targetvol:                                                 # But what if the last dam is a whopper and we exceed the target by a huge amount? This actually happened on the first test! The target was 800, the last dam was 50ML!
-            median_dam_vol = np.median(sampled_values)
-            while sumvol > targetvol + median_dam_vol:                         # Check excess volume compared to a typical dam. If we compare by percentage, we might never land a solution.
-                removed_value = sampled_values.pop()                           # Remove the last sampled value
-                sumvol -= removed_value                                        # Update the total volume by subtracting the removed value
+
+    # Reduce the final dam so the population sums to the target volume exactly. The overshoot is
+    # always smaller than the last dam (sumvol was below the target before it was added), so the
+    # dam stays positive. This replaces an earlier approach that popped whole dams off the end
+    # whenever the running total overshot: because a large dam causes the biggest overshoot and is
+    # the last one added, it was preferentially removed and back-filled with small dams. That
+    # stripped the large-volume bins and inflated the dam count, making the sampled population (and
+    # its impact) very sensitive to the random seed.
+    sampled_values[-1] -= (sumvol - targetvol)
 
     damlist['vol_ML'] = sampled_values
     
@@ -219,7 +222,7 @@ def catch_areas_random(volumes,params):
     total_area = params['cat_area_km2']
     
     # set up a random number generator
-    rng = np.random.default_rng(seed=42)
+    rng = np.random.default_rng(seed=params.get('seed', 42))
     
     # set up result list
     catch_areas = volumes * 0.0
