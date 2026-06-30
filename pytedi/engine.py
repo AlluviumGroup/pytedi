@@ -278,7 +278,7 @@ def tedi_engine_up(flow,rain,evap,demd,years,monthday,history,dams,catcharea,ist
     alldam_array = np.empty((nrows, n_output, 16))
 
     # set up ENDstore array, set ENDstore = capacity x start proportion
-    estore = dams[:,0] * startprop
+    estore = dams[:,0] * startprop * history[0]
 
     # set up basic parameters for the bisection
     increment = 2.0
@@ -395,9 +395,9 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
     numdams = len(dams)
     dsflows = np.zeros(numdams)
     if output_tf:                                                              # only allocate the (per output dam) results when reporting
-        dam_results = np.empty((numdams, 11))
+        dam_results = np.empty((numdams, 16))
     else:
-        dam_results = np.empty((0, 11))
+        dam_results = np.empty((0, 16))
     nout = 0
 
     # set up variables needed for the NEXT timestep
@@ -422,21 +422,21 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
 
         ss = sstore[idam]
 
-        capc = dams[idam,0]                                                    # assign dam characteristics and parameters
+        capc = dams[idam,0] * history                                          # assign dam characteristics and parameters
 
         if varyarea:
-            surf = (ss/a)**(1/b)                                               # surface area varies with volume stored   v = a.s**b  so s = (v/a) ** (1/b)
+            surf = ((ss/a)**(1/b)) * history                                   # surface area varies with volume stored   v = a.s**b  so s = (v/a) ** (1/b)
         else:                                                                  # OR
-            surf = dams[idam,1]                                                # surface area is always the maximum
+            surf = dams[idam,1] * history                                      # surface area is always the maximum
 
         ctch = dams[idam,2]
-        dfac = dams[idam,3]
+        dfac = dams[idam,3] * history
         buildyr = int(dams[idam,4])
         demdid = int(dams[idam,5])
-        bprate = dams[idam,6]
+        bprate = dams[idam,6] * history
         bpstart = int(dams[idam,7])
         bpend = int(dams[idam,8])
-        wfrate = dams[idam,9]
+        wfrate = dams[idam,9] * history
         wfstart = int(dams[idam,10])
         wfend = int(dams[idam,11])
         dsdam = int(dams[idam,12])

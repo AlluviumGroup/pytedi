@@ -34,10 +34,13 @@ model_10days.save_results_global(r'C:\Users\robert.morden\OneDrive - Alluvium Co
 model_10days.save_results_individual(r'C:\Users\robert.morden\OneDrive - Alluvium Consulting Australia\_Roberts stuff\Tools\Python\pytedi\pytedi_github\Out2_pytedi_10days.csv')
 
 fname = 'F1.scn'
-f1model,f1params = pytedi.open_windows_STEDI_scenario(fname)
+f1model = pytedi.open_windows_STEDI_scenario(fname)
+dam_number = 27                                                     # this is the 27th dam in the “damlist”
+f1model.damlist.loc[dam_number,'output'] = 1                        # set the flag to 1 to produce results
 f1model.run_model()
 f1model.save_results_global(r'F1_pytedi_out_global.csv')
 f1model.save_results_individual(r'F1_pytedi_out_indiv.csv')
+f1model.save_model('F1_model')
 
 fname = 'F4_damlist.scn'
 f4model,f4params = pytedi.open_windows_STEDI_scenario(fname)
@@ -57,3 +60,17 @@ t2model = pytedi.open_pytedi_scenario(fname)
 t2model.run_model()
 t2model.save_model("test2_5dams_pytedi")
 t2model.save_results_global('test2_5dams_pytedi_globalout.csv')
+
+parameter_file = ('F1_model_params.scn')
+mymodel2 = pytedi.open_pytedi_scenario(parameter_file)       # opens the model and assigns it to ‘mymodel2’
+
+# set up some alternative scaling dates and values
+histdates = ['1950-01-01', '2000-01-01', '2010-01-01', '2030-01-01']
+histvalues = [0.0, 0.0, 1.0, 1.0]                                          # 0% in 1950, 40% in 2000, 100% in 2010 onwards
+
+# add them to the model and run
+mymodel2.histoscale = mymodel2.histoscale.reindex(pd.DatetimeIndex(histdates))
+mymodel2.histoscale.loc[:,'histoscale'] = histvalues
+mymodel2.run_model()                                                     # now run the model
+# plot the impact so the long term trend is visible
+mymodel2.catch_results['agg_impact'].resample('YS').sum().plot()
