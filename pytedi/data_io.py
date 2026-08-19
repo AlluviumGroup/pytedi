@@ -15,7 +15,6 @@ Reading the old STEDI files needed over 1000 lines of code. Hopefully the native
 import pandas as pd
 import numpy as np
 import os
-import yaml
 import io
 from . import config
 
