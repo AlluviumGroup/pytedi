@@ -98,7 +98,7 @@ def STEDI_bypasses(params,dams):
         filt = dams['catchuptotal_km2'] <= minarea
         rate.loc[filt] = 0.0
         
-    bpass = pd.DataFrame({'bypass_MLperT':rate,'bypass_start_ddmm':sdate,'bypass_end_ddmm':edate})
+    bpass = pd.DataFrame({'bypass_MLperT':rate,'bypass_start_mmdd':sdate,'bypass_end_mmdd':edate})
     
     return bpass
 #%%=====================================================================================================================
@@ -137,6 +137,6 @@ def STEDI_winterfill(params,dams):
     sdate = pd.Series(sdate, index=dams.index)
     edate = pd.Series(edate, index=dams.index)
             
-    wfill = pd.DataFrame({'wfill_MLperT':rate,'wfill_start_ddmm':sdate,'wfill_end_ddmm':edate})
+    wfill = pd.DataFrame({'wfill_MLperT':rate,'wfill_start_mmdd':sdate,'wfill_end_mmdd':edate})
 
     return wfill

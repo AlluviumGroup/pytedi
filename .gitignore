@@ -8,6 +8,7 @@ F8.cmn
 F8.fmn
 F8steadi_v1-24.scn
 pytedi_planning.py
+pytedi_testing_v1.py
 
 # Python packaging artifacts
 build/

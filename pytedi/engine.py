@@ -107,8 +107,8 @@ def calc_from_up_to_down(damlist_df, demands_df, rain_df, evap_df, flowin_df, ca
     
     damlist_array = damlist_df.loc[:,['vol_ML','surfacearea_m2','catchuplocal_km2',
                                       'demfactor','year_start','demand_id',
-                                      'bypass_MLperT','bypass_start_ddmm','bypass_end_ddmm',
-                                      'wfill_MLperT','wfill_start_ddmm','wfill_end_ddmm',
+                                      'bypass_MLperT','bypass_start_mmdd','bypass_end_mmdd',
+                                      'wfill_MLperT','wfill_start_mmdd','wfill_end_mmdd',
                                       'dsdam','output']].to_numpy(dtype='float64')
     
     # convert timeseries to numpy arrays
@@ -202,8 +202,8 @@ def calc_from_down_to_up(damlist_df, demands_df, rain_df, evap_df, flowout_df, c
     
     damlist_array = damlist_df.loc[:,['vol_ML','surfacearea_m2','catchuplocal_km2',
                                       'demfactor','year_start','demand_id',
-                                      'bypass_MLperT','bypass_start_ddmm','bypass_end_ddmm',
-                                      'wfill_MLperT','wfill_start_ddmm','wfill_end_ddmm',
+                                      'bypass_MLperT','bypass_start_mmdd','bypass_end_mmdd',
+                                      'wfill_MLperT','wfill_start_mmdd','wfill_end_mmdd',
                                       'dsdam','output']].to_numpy(dtype='float64')
 
     # convert timeseries to numpy arrays
@@ -417,6 +417,7 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
     demdact_sum = 0.0
     bpact_sum = 0.0
     wfact_sum = 0.0
+    spills_sum = 0.0
 
     for idam in range(0,numdams):                                              # for each dam in the catchment
 
@@ -468,7 +469,10 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
             ctch = dams[idam,2]
             dfac = 0.0
             ss = 0.0
-
+        
+        if yy == 1900 and mmdd==103:      # just a little debug line...
+            spills = 0.0
+        
         # calc inflow, rain, evap, demand, outflows, impact
         localinflow = ctch / catcharea * flow                                  # inflow = damarea / catcharea x flow
         updamspill = dsflows[idam]                                             # outflows form upstream dams
@@ -477,31 +481,36 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
         netevap = surf * (evap-rain) / 1e6                                     # netevap = surface area x netevap / 1e6
         demand = capc * dfac * dem                                             # demand = capacity x demfactor x pattern
         
-        bal = (ss + netinflow - netevap - demand + wfrate)                     # raw water balance
-        
-        wfrate_act = wfrate
+        spills = 0.0                                           # initialise spills
+        storstep = ss                                          # step storage = starting storage for timestep
+        wfrate_act = 0.0                                       # winterfill is initially SWITCHED OFF
         netevap_act = netevap
         demand_act = demand
         
-        es = bal
-        spills = 0.0
+        projected_storage = ss + netinflow - netevap - demand  # projected storage without winterfill
         
-        if bal > capc:                                                         #### too much water... reduce winterfill and allow to spill, demand and netevap stay the same
-            
-            bal2 = (ss + netinflow - netevap_act + demand_act)
-            wfrate_act = max(0.0, min(wfrate, capc - bal2))                    # wfill = lesser of peak rate or (dam capacity - (start storage + inflows - netevap - demand))
-            
-            es = capc
-            spills = bal - capc
-            
-        elif bal < 0.0:                                                        #### not enough water... reduce demand and netevap, but wfill stays unchanged
-            
-            bal2 = (ss + netinflow + wfrate_act)
-            factor = bal2 / (bal2 - bal) # factor = proportion of the timestep that the dam had water
-            netevap_act = netevap * factor
-            demand_act = demand * factor
-            
-            es = 0.0
+        if projected_storage < capc:                           # if no spills
+            available_airspace = capc - max(projected_storage,0.0)
+            wfrate_act = min(wfrate, available_airspace)           # wfill SWITCHED ON
+        
+        storstep += netinflow                                  # priority 1 - inflow (always add this, work out spills later)
+        storstep += wfrate_act                                 # priority 2 - winterfill
+        
+        storstep -= netevap                                    # priority 3 - net evaporation
+        if storstep < 0.0:                                        # check if net evaporation exceeds available water
+            netevap_act = netevap - (0-storstep)
+            storstep = 0.0
+
+        storstep -= demand                                     # priority 4 - on-farm demands
+        if storstep < 0.0:                                        # check if demand exceeds available water
+            demand_act = demand - (0-storstep)
+            storstep = 0.0
+
+        if storstep > capc:                                    # check for spills
+            spills = storstep - capc
+            storstep = capc
+
+        es = storstep                                          # end storage = step storage
         
         outflow = spills + bprate_act
         if dsdam>=0:                                                           # if the next downstream id is -99, then no need to aggregate
@@ -514,6 +523,7 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
         demd_sum += demand
         bp_sum += bprate
         wf_sum += wfrate
+        spills_sum += spills
         estore_sum += es
         
         # aggregate ACTUAL values where the storage status can affect them
@@ -523,9 +533,9 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
         wfact_sum += wfrate_act
         
         if idam == numdams-1:
-            spills_sum = spills
+            spills_sum -= spills                                               # need to remove the spills from the outlet (they are not really spills, just a calculation convenience)
             outflow_sum = outflow
-            aggimpact_sum = flow_up_sum - outflow_sum                           # impact = Q-NoDams - Q-WithDams; bypass is already part of outflow_sum, do not subtract again
+            aggimpact_sum = flow_up_sum - outflow_sum                          # impact = Q-NoDams - Q-WithDams; bypass is already part of outflow_sum, do not subtract again
     
         # prepare results for a single dam only if the dam is marked for output
         if damoutput:

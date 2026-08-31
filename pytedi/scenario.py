@@ -463,7 +463,16 @@ def read_scenario_winstedi_v1(scenfile):
                                                                   'catchuptotal_km2': ca,
                                                                   'group_name': demgroup,
                                                                   'wfill_MLperT': wfill,
-                                                                  'bypass_MLperT': bypass})
+                                                                  'bypass_MLperT': bypass}).astype({
+                                                                      "dam_id": "int32",
+                                                                      "ds_damid": "int32",
+                                                                      "surfacearea_m2": "float64",
+                                                                      "vol_ML": "float64",
+                                                                      "catchuptotal_km2": "float64",
+                                                                      "group_name": "string",
+                                                                      "wfill_MLperT": "float64",
+                                                                      "bypass_MLperT": "float64",
+                                                                      })
                                 
                             case _:
                                 pass

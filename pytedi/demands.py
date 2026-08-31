@@ -155,7 +155,7 @@ def demgroups_bylist(params,dams):
     damlist = params['damlist']
     
     # get the group names
-    groups = damlist['group_name']
+    groups = damlist.loc[1:,'group_name']
     
     # get the factors
     if params['demand_pattern_method'] == '12m': 

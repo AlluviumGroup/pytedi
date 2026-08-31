@@ -72,11 +72,11 @@ class tedimodel():
             group_name            string                   name of demand group (eg. stock and domestic, irrigaton, vineyard, etc)
             demfactor             float64                  mean annual demand as a proportion of dam capacity
             bypass_MLperT         float64                  bypass flow rate in ML per day/month
-            bypass_start_ddmm     integer                  start date of bypass (eg. 1 Jan = 0101, 15th July = 1507)
-            bypass_end_ddmm       integer                  end date of bypass (eg. 1 Jan = 0101, 15th July = 1507)
+            bypass_start_mmdd     integer                  start date of bypass (eg. 1 Jan = 0101, 15th July = 0715)
+            bypass_end_mmdd       integer                  end date of bypass (eg. 1 Jan = 0101, 15th July = 0715)
             wfill_MLperT          float64                  bypass flow rate in ML per day/month
-            wfill_start_ddmm      integer                  start date of bypass (eg. 1 Jan = 0101, 15th July = 1507)
-            wfill_end_ddmm        integer                  end date of bypass (eg. 1 Jan = 0101, 15th July = 1507)
+            wfill_start_mmdd      integer                  start date of bypass (eg. 1 Jan = 0101, 15th July = 0715)
+            wfill_end_mmdd        integer                  end date of bypass (eg. 1 Jan = 0101, 15th July = 0715)
             output                integer                  flag = 1 to produce water balance results for this dam, or anything else otherwise
         histoscale            dataframe                Timeseries of historic scaling factors to apply (eg. 01/01/1950 = 0.0, 1/1/2010 = 1.0, 1/1/2050 = 1.0)
         ts                    dataframe                Timeseries of demand, climate, and flow
@@ -120,8 +120,8 @@ class tedimodel():
         self.rundate = np.nan
         
         cols =  ['dam_id',          'ds_damid',     'surfacearea_m2',    'catchuptotal_km2', 'catchuplocal_km2',  'vol_ML',          
-                 'year_start',      'group_name',    'demfactor',         'bypass_MLperT',   'bypass_start_ddmm', 
-                 'bypass_end_ddmm', 'wfill_MLperT',  'wfill_start_ddmm',  'wfill_end_ddmm',  'output']
+                 'year_start',      'group_name',    'demfactor',         'bypass_MLperT',   'bypass_start_mmdd', 
+                 'bypass_end_mmdd', 'wfill_MLperT',  'wfill_start_mmdd',  'wfill_end_mmdd',  'output']
         
         types = ['int32',           'int32',         'float64',           'float64',         'float64',           'float64',         
                  'int32',           'string',        'float64',           'float64',         'int32', 
@@ -288,16 +288,16 @@ def open_windows_STEDI_scenario(fname, network_from_out=None, seed=42):
         _inject_network_into_params(stedi_params, net)
         logger.info('Using explicit STEDI network (%d dams) from %s', len(net), out_path)
 
-    dams = process_STEDI_dams(stedi_params)                                    # make sense of the dams                           DONE
+    dams = process_STEDI_dams(stedi_params)                                    # make sense of the dams
     logger.info('Processed the list of dams...')
     
-    bpass,wfill = process_STEDI_bypasses(stedi_params,dams)                    # make sense of the bypasses                       DONE
+    bpass,wfill = process_STEDI_bypasses(stedi_params,dams)                    # make sense of the bypasses
     logger.info('Processed bypass and winterfill details...')
     
-    clim = process_STEDI_climate(stedi_params)                                 # make sense of the climate                        DONE
+    clim = process_STEDI_climate(stedi_params)                                 # make sense of the climate
     logger.info('Processed rainfall and evaporation...')
     
-    d_ts, d_groups, d_factors = process_STEDI_demands(stedi_params,dams,clim)  # make sense of the demands                        DONE
+    d_ts, d_groups, d_factors = process_STEDI_demands(stedi_params,dams,clim)  # make sense of the demands
     logger.info('Processed demand details...')
     
     # define variable as a 'tedimodel' object
@@ -323,17 +323,17 @@ def open_windows_STEDI_scenario(fname, network_from_out=None, seed=42):
     model.damlist.loc[:,'year_start'] = 0
     
     # add demand info to dam list
-    model.damlist.loc[:,'group_name'] = d_groups
-    model.damlist.loc[:,'demfactor'] = d_factors
+    model.damlist.loc[:,'group_name'] = d_groups.loc[:]
+    model.damlist.loc[:,'demfactor'] = d_factors.loc[:]
     
     # add bypasses and winterfill to dam list
     model.damlist.loc[:,'bypass_MLperT'] = bpass.loc[:,'bypass_MLperT']
-    model.damlist.loc[:,'bypass_start_ddmm'] = bpass.loc[:,'bypass_start_ddmm']
-    model.damlist.loc[:,'bypass_end_ddmm'] = bpass.loc[:,'bypass_end_ddmm']
+    model.damlist.loc[:,'bypass_start_mmdd'] = bpass.loc[:,'bypass_start_mmdd']
+    model.damlist.loc[:,'bypass_end_mmdd'] = bpass.loc[:,'bypass_end_mmdd']
 
     model.damlist.loc[:,'wfill_MLperT'] = wfill.loc[:,'wfill_MLperT']
-    model.damlist.loc[:,'wfill_start_ddmm'] = wfill.loc[:,'wfill_start_ddmm']
-    model.damlist.loc[:,'wfill_end_ddmm'] = wfill.loc[:,'wfill_end_ddmm']
+    model.damlist.loc[:,'wfill_start_mmdd'] = wfill.loc[:,'wfill_start_mmdd']
+    model.damlist.loc[:,'wfill_end_mmdd'] = wfill.loc[:,'wfill_end_mmdd']
     
     # add climate and flow to ts
     model.ts['rain'] = clim['rain']

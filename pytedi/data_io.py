@@ -176,11 +176,11 @@ historical_scaling_factors =      [{joinfactors}]
 # group_name        = the name of the demand group, such as 'irrigation' or 'stock and domestic'
 # demfactor         = the average annual demand expressed as a proportion of the dam capacity
 # bypass_MLperT     = the flow rate of the bypass (ML per timestep)
-# bypass_start_ddmm = the start of the bypass season as integer mmdd eg. 1st March would be 0301, or 15th June would be 0615
-# bypass_end_ddmm   = the end of the bypass season as integer mmdd eg. 1st March would be 0301, or 15th June would be 0615
+# bypass_start_mmdd = the start of the bypass season as integer mmdd eg. 1st March would be 0301, or 15th June would be 0615
+# bypass_end_mmdd   = the end of the bypass season as integer mmdd eg. 1st March would be 0301, or 15th June would be 0615
 # wfill_MLperT      = the flow rate of winterfill pumping (ML per timestep)
-# wfill_start_ddmm  = the start of the winterfill season as integer mmdd eg. 1st March would be 0301, or 15th June would be 0615
-# wfill_end_ddmm    = the end of the winterfill season as integer mmdd eg. 1st March would be 0301, or 15th June would be 0615
+# wfill_start_mmdd  = the start of the winterfill season as integer mmdd eg. 1st March would be 0301, or 15th June would be 0615
+# wfill_end_mmdd    = the end of the winterfill season as integer mmdd eg. 1st March would be 0301, or 15th June would be 0615
 # output            = set to 1 to flag that results for this individual dam should be reported in the individual results file (any other value will give no results output)
 # demand_id         = integer linked to the group_name
 #
@@ -224,7 +224,7 @@ def add_suffix_to_filename(filename, suffix, extension):
     base, ext = os.path.splitext(filename)
     if not ext:  # If there is no extension, use '.scn'
         ext = extension
-    return f"{base}_{suffix}.{ext}"
+    return f"{base}_{suffix}.{extension}"
 
 # %%=======================================================================================================================
 def _strip_line_indents(text):
