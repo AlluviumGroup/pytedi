@@ -470,8 +470,8 @@ def stedi_engine_down_singlestep(flow,rain,evap,demd,yy,mmdd,history,dams,catcha
             dfac = 0.0
             ss = 0.0
         
-        if yy == 1900 and mmdd==103:      # just a little debug line...
-            spills = 0.0
+        # if yy == 1900 and mmdd==103:      # just a little debug line...
+        #     spills = 0.0
         
         # calc inflow, rain, evap, demand, outflows, impact
         localinflow = ctch / catcharea * flow                                  # inflow = damarea / catcharea x flow
