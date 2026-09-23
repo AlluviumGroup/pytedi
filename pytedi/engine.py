@@ -611,7 +611,11 @@ def damlist_preprocessing(damlist_df, demands_df, cat_area, scale_limit):
     new_row_idx = len(damlist_df)
 
     # Any dams which connect downstream to -99 or any other unknown dam id? Set them equal to the catchment outlet.
-    filt = ~damlist_df['dsdam'].isin(damlist_df['dam_id'])           # ds_dam is NOT in dam_id
+    # NOTE that 'dsdam' holds ROW INDICES (it was just mapped through dam_id_to_index), so it has to be
+    # checked against the valid row indices. Checking it against 'dam_id' silently re-pointed valid links
+    # at the outlet whenever the target's row index was not also a dam id - which disconnected every
+    # two-dam series.
+    filt = ~damlist_df['dsdam'].isin(damlist_df.index)               # dsdam is NOT a valid row index
     damlist_df.loc[filt,'dsdam'] = new_row_idx
 
     # add a row at the end to represent the catchment outlet
