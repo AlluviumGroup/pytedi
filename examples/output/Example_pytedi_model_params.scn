@@ -1,0 +1,36 @@
+# pytedi - Python tool for estimating dam impacts
+# ===============================================
+#
+# Version 0.2.0 - August 2026
+# Authors - Robert Morden and Ella Guthrie (Alluvium Consulting) and Joel Rahman (Flow Matters)
+#
+# -----------------------
+# MODEL FILE - PARAMETERS
+# -----------------------
+#
+
+model_title =                     "Example stream natural calculation"
+
+model_timestep =                  "day"
+
+calculating_natural_or_observed = "nat"
+
+total_catchment_area =            230.0
+
+scale_limit =                     0.8
+
+variable_surface_areas =          false
+
+volume_to_surfarea_a =            0.000145
+volume_to_surfarea_b =            1.314
+
+starting_storage_proportion =     0.0
+
+date_last_run =                   "2026-10-27 18:47:20"
+
+damlist_file =                    'output\Example_pytedi_model_dams.csv'
+
+timeseries_file =                 'output\Example_pytedi_model_timeseries.csv'
+
+historical_scaling_dates   =      ["1800-01-01", "2100-01-01"]
+historical_scaling_factors =      [1.0, 1.0]

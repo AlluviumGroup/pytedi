@@ -62,13 +62,14 @@ class tedimodel():
         stedi_params          dict                     dictionary of all of the parameters read from a windows STEDI scenario file
         pyparams              dict                     dictionary of all of the parameters read from a pytedi scenario file
         damlist               dataframe                List of dams in the catchment and their characteristics
-            dam_id                integer                  dam unique id
-            ds_dam_id             integer                  unique id of the dam downstream (-99 if none downstream)
+            dam_id                string                   dam unique id
+            ds_dam_id             string                   unique id of the dam downstream (-99 if none downstream)
             surfacearea_m2        float64                  dam surface area (m2)
             catchuptotal_km2      float64                  total catchment area upstream (including other dams)
             catchuplocal_km2      float64                  local catchment area upstream (excluding other dams)
             vol_ML                float64                  maximum capacity (ML)
             year_start            integer                  year when dam is completed
+            year_end              integer                  first year in which the dam is decommissioned; use 9999 if it remains operational
             group_name            string                   name of demand group (eg. stock and domestic, irrigaton, vineyard, etc)
             demfactor             float64                  mean annual demand as a proportion of dam capacity
             bypass_MLperT         float64                  bypass flow rate in ML per day/month
@@ -120,11 +121,11 @@ class tedimodel():
         self.rundate = np.nan
         
         cols =  ['dam_id',          'ds_damid',     'surfacearea_m2',    'catchuptotal_km2', 'catchuplocal_km2',  'vol_ML',          
-                 'year_start',      'group_name',    'demfactor',         'bypass_MLperT',   'bypass_start_mmdd', 
-                 'bypass_end_mmdd', 'wfill_MLperT',  'wfill_start_mmdd',  'wfill_end_mmdd',  'output']
+                 'year_start',      'year_end',     'group_name',        'demfactor',        'bypass_MLperT',     'bypass_start_mmdd', 
+                 'bypass_end_mmdd', 'wfill_MLperT', 'wfill_start_mmdd',  'wfill_end_mmdd',   'output']
         
-        types = ['int32',           'int32',         'float64',           'float64',         'float64',           'float64',         
-                 'int32',           'string',        'float64',           'float64',         'int32', 
+        types = ['string',          'string',        'float64',           'float64',         'float64',           'float64',         
+                 'int32',           'int32',         'string',            'float64',         'float64',           'int32', 
                  'int32',           'float64',       'int32',             'int32',           'int32']
         
         self.damlist = pd.DataFrame(columns=cols).astype(dict(zip(cols,types)))
@@ -137,13 +138,11 @@ class tedimodel():
         cols = ['rain', 'evap', 'flowup', 'flowdown']
         self.ts = pd.DataFrame(columns=cols,dtype='float32')
 
-        #cols = ['sstore', 'flow_up', 'netevap', 'demd_sum', 'wf', 'bp', 'estore', 'flow_down', 'agg_impact']
         cols = ['sstore', 'flow_up', 'netevap', 'netevap_actual', 'demand', 'demand_actual', 'wf', 'wf_actual', 'bp', 'bp_actual', 'estore', 'spills', 'flow_down', 'agg_impact']
         self.catch_results = pd.DataFrame(columns=cols,dtype='float32')
 
-        #cols =  ['istep', 'idam', 'sstore', 'local_inflow','updam_spill','netevap','demand', 'wf',     'bp',     'es',     'outflow']
-        cols =  ['istep', 'idam', 'date',          'sstore', 'local_inflow','updam_spill','netevap','netevap_actual','demand', 'demand_actual','wf',     'wf_actual','bp',     'bp_actual','es',     'spills', 'outflow']
-        types = ['int32', 'int32','datetime64[ns]','float32','float32',     'float32',    'float32','float32',       'float32','float32',      'float32','float32',  'float32','float32',  'float32','float32','float32']   # first two columns are integers
+        cols =  ['istep', 'dam_id', 'date',          'sstore', 'local_inflow','updam_spill','netevap','netevap_actual','demand', 'demand_actual','wf',     'wf_actual','bp',     'bp_actual','es',     'spills', 'outflow']
+        types = ['int32', 'object', 'datetime64[ns]','float32','float32',     'float32',    'float32','float32',       'float32','float32',      'float32','float32',  'float32','float32',  'float32','float32','float32']   # first two columns are integers
         self.indiv_results = pd.DataFrame(columns=cols).astype(dict(zip(cols,types)))
         
         self.pyparams = {}
@@ -195,11 +194,11 @@ class tedimodel():
         self.histoscale = pyparams['histoscale']
         self.ts = pyparams['ts']
 
-        cols = ['sstore', 'flow_up', 'netevap', 'demd_sum', 'wf', 'bp', 'estore', 'flow_down', 'agg_impact']
+        cols = ['sstore', 'flow_up', 'netevap', 'netevap_actual', 'demand', 'demand_actual', 'wf', 'wf_actual', 'bp', 'bp_actual', 'estore', 'spills', 'flow_down', 'agg_impact']
         self.catch_results = pd.DataFrame(columns=cols,dtype='float32')
 
-        cols =  ['istep', 'idam', 'sstore', 'local_inflow','updam_spill','netevap','demand', 'wf',     'bp',     'es',     'outflow']
-        types = ['int32', 'int32','float32','float32',     'float32',    'float32','float32','float32','float32','float32','float32']   # first two columns are integers
+        cols =  ['istep', 'dam_id', 'date',          'sstore', 'local_inflow','updam_spill','netevap','netevap_actual','demand', 'demand_actual','wf',     'wf_actual','bp',     'bp_actual','es',     'spills', 'outflow']
+        types = ['int32', 'object', 'datetime64[ns]','float32','float32',     'float32',    'float32','float32',       'float32','float32',      'float32','float32',  'float32','float32',  'float32','float32','float32']   # first two columns are integers
         self.indiv_results = pd.DataFrame(columns=cols).astype(dict(zip(cols,types)))
         
         self.pyparams = pyparams
@@ -314,13 +313,14 @@ def open_windows_STEDI_scenario(fname, network_from_out=None, seed=42):
         model.vol_surfarea_b = stedi_params['vol_surfarea_b']
     
     # add dam list
-    model.damlist['dam_id'] = dams.loc[:,'dam_id']
-    model.damlist.loc[:,'ds_damid'] = dams.loc[:,'ds_damid']
-    model.damlist.loc[:,'surfacearea_m2'] = dams.loc[:,'surfacearea_m2']
-    model.damlist.loc[:,'vol_ML'] = dams.loc[:,'vol_ML']
+    model.damlist['dam_id']                 = dams['dam_id'].astype('int64').astype('string')
+    model.damlist.loc[:,'ds_damid']         = dams.loc[:,'ds_damid'].astype('int64').astype('string')
+    model.damlist.loc[:,'surfacearea_m2']   = dams.loc[:,'surfacearea_m2']
+    model.damlist.loc[:,'vol_ML']           = dams.loc[:,'vol_ML']
     model.damlist.loc[:,'catchuptotal_km2'] = dams.loc[:,'catchuptotal_km2']
     model.damlist.loc[:,'catchuplocal_km2'] = dams.loc[:,'catchuplocal_km2']
-    model.damlist.loc[:,'year_start'] = 0
+    model.damlist.loc[:,'year_start']       = 0
+    model.damlist.loc[:,'year_end']         = 9999
     
     # add demand info to dam list
     model.damlist.loc[:,'group_name'] = d_groups.loc[:]

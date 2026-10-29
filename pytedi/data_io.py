@@ -61,7 +61,7 @@ def write_results_global(model,outfile):
 def write_results_individual(model,outfile):
 
     #out_cols =  ['idam', 'date', 'sstore', 'local_inflow', 'updam_spill', 'netevap', 'demand', 'es', 'outflow','bp']    # swapped column position of bypass flow, remove istep
-    out_cols = ['idam', 'date', 'sstore', 'local_inflow','updam_spill','netevap','netevap_actual','demand', 'demand_actual','wf','wf_actual','bp','bp_actual','es','spills', 'outflow']
+    out_cols = ['dam_id', 'date', 'sstore', 'local_inflow','updam_spill','netevap','netevap_actual','demand', 'demand_actual','wf','wf_actual','bp','bp_actual','es','spills', 'outflow']
     out_df = model.indiv_results[out_cols].copy()
 
     nice_cols = ['Dam ID','Date of obs','Start storage (ML)','Local upstream runoff (ML)','Upstream spills (ML)',

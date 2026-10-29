@@ -16,7 +16,7 @@ def _model_with_active_bypass():
     m.cat_area_km2 = 10.0
 
     # one dam: 2 km2 local catchment, 5 ML capacity, 1 ML/day bypass all year
-    m.damlist.loc[0] = [1, -99, 500.0, 2.0, 2.0, 5.0, 0, "Irrigation",
+    m.damlist.loc[0] = [1, -99, 500.0, 2.0, 2.0, 5.0, 0, 9999, "Irrigation",
                         0.5, 1.0, 101, 1231, 0.0, 101, 1231, 1]
 
     idx = pd.date_range("2000-01-01", periods=10, freq="D")

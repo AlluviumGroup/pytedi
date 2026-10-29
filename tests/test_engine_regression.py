@@ -22,8 +22,8 @@ def _build(calc):
     m.timestep = "day"
     m.calc_nat_or_obs = calc
     m.cat_area_km2 = 12.0
-    m.damlist.loc[0] = [1, -99, 1500.0, 3.0, 3.0, 8.0, 0, "Irrigation", 0.6, 0.0, 101, 1231, 0.0, 101, 1231, 1]
-    m.damlist.loc[1] = [2, -99, 800.0, 2.0, 2.0, 4.0, 0, "Stock", 0.4, 0.0, 101, 1231, 0.0, 101, 1231, 1]
+    m.damlist.loc[0] = [1, -99, 1500.0, 3.0, 3.0, 8.0, 0, 9999, "Irrigation", 0.6, 0.0, 101, 1231, 0.0, 101, 1231, 1]
+    m.damlist.loc[1] = [2, -99, 800.0, 2.0, 2.0, 4.0, 0, 9999, "Stock", 0.4, 0.0, 101, 1231, 0.0, 101, 1231, 1]
     idx = pd.date_range("2000-01-01", periods=12, freq="D")
     ts = pd.DataFrame(index=idx)
     ts["rain"] = [0, 5, 12, 0, 0, 3, 20, 0, 0, 8, 0, 1.0]

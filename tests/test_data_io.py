@@ -22,9 +22,9 @@ def _make_minimal_model():
 
     # two dams. The 'output' flag is left NaN for the second dam, as happens for
     # distribution-generated dams in real scenarios (only flagged dams get output=1).
-    m.damlist.loc[0] = [1, -99, 1000.0, 2.0, 1.5, 5.0, 0, "Stock&Domestic",
+    m.damlist.loc[0] = [1, -99, 1000.0, 2.0, 1.5, 5.0, 0, 9999, "Stock&Domestic",
                         0.5, 0.0, 101, 1231, 0.0, 101, 1231, 1]
-    m.damlist.loc[1] = [2, 1, 2000.0, 4.0, 2.0, 10.0, 0, "Irrigation",
+    m.damlist.loc[1] = [2, 1, 2000.0, 4.0, 2.0, 10.0, 0, 9999, "Irrigation",
                         0.8, 0.0, 101, 1231, 0.0, 101, 1231, np.nan]
 
     # short timeseries
