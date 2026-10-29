@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/robmorden/pytedi"
+Homepage = "https://github.com/AlluviumGroup/pytedi"
 
 [tool.setuptools.packages.find]
 include = ["pytedi*"]

@@ -5,7 +5,10 @@ pytedi - Python Tool for Estimating Dam Impacts
 -----------------------------------------------
 
 Dr Robert Morden
-June 2026
+Joel Rahman
+Ella Guthrie
+
+November 2026
 
 The TEDI algorithm is based on the original paper by Nathan et al (2005), with several papers adding further to the data input methodology and calculation methods.
 
