@@ -72,6 +72,8 @@ If you really know what you are doing, you can download the wheel file directly 
 
 ## Example usage
 
+For more detailed information about how to use pyTEDI, please read the [user manual](UserManual.md).
+
 To open and run an existing model file (.scn) created using the old Windows-based STEDI tool, you would use the following code:
 
 ```python

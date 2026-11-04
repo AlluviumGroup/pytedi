@@ -4,7 +4,7 @@ pytedi - Python Tool for Estimating Dam Impacts
 -----------------------------------------------
 
 Dr Robert Morden
-June 2026
+November 2026
 
 These are the routines for converting old windows scenario files.
 Users can convert old windows STEDI and TEDI files for use with pyTEDI.

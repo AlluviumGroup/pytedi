@@ -5,7 +5,7 @@ pytedi - Python Tool for Estimating Dam Impacts
 -----------------------------------------------
 
 Dr Robert Morden
-January 2026
+November 2026
 
 This is the code for setting up bypasses and other related functions.
 

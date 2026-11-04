@@ -4,7 +4,7 @@ pytedi - Python Tool for Estimating Dam Impacts
 -----------------------------------------------
 
 Dr Robert Morden
-June 2026
+November 2026
 
 These are the functions for reading and writing model data in a native pytedi format.
 Reading the old STEDI files needed over 1000 lines of code. Hopefully the native format will be quicker and easier.

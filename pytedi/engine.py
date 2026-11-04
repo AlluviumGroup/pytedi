@@ -5,7 +5,7 @@ pytedi - Python Tool for Estimating Dam Impacts
 -----------------------------------------------
 
 Dr Robert Morden
-January 2026
+November 2026
 
 This is the TEDI engine where the timestep calculations are done.
 

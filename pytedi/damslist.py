@@ -5,7 +5,7 @@ pytedi - Python Tool for Estimating Dam Impacts
 -----------------------------------------------
 
 Dr Robert Morden
-June 2026
+November 2026
 
 This is where a list of dams is developed based on input data.
 Inputs could be a straightforward dataframe, or an old STEDI scenario file.
