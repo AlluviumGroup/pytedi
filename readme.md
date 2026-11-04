@@ -40,7 +40,7 @@ PyTEDI is a hydrological modelling tool which is intended to work within Python 
 
 ## History
 
-TEDI (later renamed STEDI) was originally developed in the late 1990s by the Victorian government, the Murray Darling Basin Commission, and Sinclair Knight Merz (now Jacobs). It was published as a Windows executable with a full graphical user interface. It has been through many incarnations and used for many purposes. The latest Windows version is available from Jacobs' website: https://www.jacobs.com/natural-resource-management
+TEDI (later renamed STEDI) was originally developed in the late 1990s by the Victorian government, the Murray Darling Basin Commission, and Sinclair Knight Merz (now Jacobs). It was published as a Windows executable with a full graphical user interface. It has been through many incarnations and used for many purposes. The latest Windows version is be available from Jacobs' website (although the download button was not working as of November 2026): https://www.jacobs.com/natural-resource-management
 
 PyTEDI is intended as a full Python-based replacement for STEDI to improve workflow efficiency and reduce scope for manual errors.
 
@@ -97,7 +97,7 @@ Please refer to the [user manual](UserManual.md) for examples of how to:
 
 ## Licence
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENCE](LICENCE) file for details.
 
 In short:
 - Feel free to use, modify and share the software.
@@ -105,7 +105,7 @@ In short:
 - The software is provided "as is", without warranty.
 - Please give credit where credit is due.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Licence: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENCE)
 
 ## Credits
 

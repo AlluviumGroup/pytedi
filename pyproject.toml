@@ -9,7 +9,7 @@ description = "Python Tool for Estimating Dam Impacts (TEDI)"
 readme = "readme.md"
 requires-python = ">=3.11"
 license = "MIT"
-license-files = ["LICENSE"]
+license-files = ["LICENCE"]
 
 authors = [
     { name = "Robert Morden" },
